@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#e8804a"/>
+  <!-- 湯気 -->
+  <g fill="none" stroke="#fff7ee" stroke-width="18" stroke-linecap="round" opacity="0.9">
+    <path d="M196 118c-18 22 18 38 0 62"/>
+    <path d="M256 104c-18 22 18 38 0 62"/>
+    <path d="M316 118c-18 22 18 38 0 62"/>
+  </g>
+  <!-- お茶碗 -->
+  <path d="M104 236h304c0 92-68 160-152 160s-152-68-152-160z" fill="#fff7ee"/>
+  <rect x="200" y="392" width="112" height="26" rx="13" fill="#fff7ee"/>
+  <path d="M136 268h240" stroke="#e8804a" stroke-width="12" stroke-linecap="round" opacity="0.35"/>
+  <!-- 箸 -->
+  <g stroke="#7a4a2a" stroke-width="16" stroke-linecap="round">
+    <path d="M300 222l128-104"/>
+    <path d="M318 232l124-86"/>
+  </g>
+</svg>

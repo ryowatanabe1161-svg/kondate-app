@@ -1,0 +1,28 @@
+// 買い物リストで材料を売り場ごとにまとめるためのルール。
+// 上から順に判定し、最初にマッチしたグループに入ります。
+
+// 買い物リストに載せない材料（家に必ずあるもの）
+export const IGNORED_INGREDIENTS = new Set(['水', '湯', 'ご飯']);
+
+export const SEASONING_GROUP = '調味料・常備品';
+
+const RULES = [
+  {
+    group: SEASONING_GROUP,
+    test: /^(醤油|しょうゆ|味噌|みそ|砂糖|塩|こしょう|塩こしょう|みりん|酒|酢|サラダ油|ごま油|オリーブオイル|揚げ油|油|片栗粉|小麦粉|パン粉|マヨネーズ|ケチャップ|ウスターソース|中濃ソース|オイスターソース|豆板醤|甜麺醤|コチュジャン|鶏がらスープの素|コンソメ|顆粒だし|だし汁|白だし|めんつゆ|ポン酢|バター|おろし生姜|おろしにんにく|白ごま|すりごま)$/,
+  },
+  { group: '卵・豆腐・乳製品', test: /卵|豆腐|油揚げ|厚揚げ|納豆|牛乳|チーズ|ヨーグルト|生クリーム/ },
+  { group: '肉・魚', test: /肉|豚|鶏|牛|ベーコン|ハム|ソーセージ|鮭|さば|ぶり|あじ|たら|さんま|いわし|えび|いか|たこ|あさり|しじみ|しらす|ちくわ|かまぼこ|ツナ/ },
+  { group: '乾物・加工品', test: /ひじき|わかめ|切り干し|昆布|のり|海苔|春雨|こんにゃく|しらたき|かつお節|ごま|大豆|干し|キムチ|缶/ },
+];
+
+export const DEFAULT_GROUP = '野菜・きのこ';
+
+// 表示順
+export const GROUP_ORDER = [DEFAULT_GROUP, '肉・魚', '卵・豆腐・乳製品', '乾物・加工品', SEASONING_GROUP];
+
+export function groupOf(ingredientName) {
+  const name = ingredientName.trim();
+  const rule = RULES.find((r) => r.test.test(name));
+  return rule ? rule.group : DEFAULT_GROUP;
+}
