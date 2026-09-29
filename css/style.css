@@ -696,3 +696,282 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .next-empty { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .next-empty-icon { font-size: 40px; line-height: 1; }
 .next-empty h3 { font-size: 17px; font-weight: 800; }
+
+/* ==========================================================
+   朝・昼・お弁当／イラスト／アニメーション（v7）
+   ========================================================== */
+:root {
+  --cat-staple: #b07a1e; /* 主食 */
+  --cat-staple-soft: #f8ecd0;
+  --cat-drink: #c0587a; /* 飲み物・デザート */
+  --cat-drink-soft: #fbe3ea;
+  --emoji-font: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dish-card.cat-staple, .recipe-row.cat-staple, .fridge-result.cat-staple { --accent: var(--cat-staple); --accent-soft: var(--cat-staple-soft); }
+.dish-card.cat-drink, .recipe-row.cat-drink, .fridge-result.cat-drink { --accent: var(--cat-drink); --accent-soft: var(--cat-drink-soft); }
+.fridge-result.cat-soup { --accent: var(--cat-soup); }
+.badge.cat-staple, .dot.cat-staple { background: var(--cat-staple-soft); color: var(--cat-staple); }
+.badge.cat-drink, .dot.cat-drink { background: var(--cat-drink-soft); color: var(--cat-drink); }
+
+/* ---------- 料理のイラスト ---------- */
+.food-art {
+  --art-bg1: #fff1e6; --art-bg2: #fdd9c2; --art-accent: #f0a06a; --art-dish: #ffffff; --art-rim: #f7ede3;
+  position: relative; display: inline-grid; place-items: center; flex-shrink: 0;
+  width: var(--art-size, 56px); height: var(--art-size, 56px); border-radius: 30%;
+  background: radial-gradient(circle at 30% 25%, var(--art-bg1), var(--art-bg2));
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+.food-art.tone-side { --art-bg1: #f1f8ea; --art-bg2: #d4eac4; --art-accent: #7fb56a; --art-rim: #eef5e8; }
+.food-art.tone-soup { --art-bg1: #fff7e3; --art-bg2: #f5e2b3; --art-accent: #b8452f; --art-rim: #f3e0d8; --art-dish: #fff9f0; }
+.food-art.tone-staple { --art-bg1: #fffaf0; --art-bg2: #f6e6c2; --art-accent: #5b86c4; --art-rim: #f5f1ea; }
+.food-art.tone-drink { --art-bg1: #fff2f6; --art-bg2: #f9d5e1; --art-accent: #f3a6be; --art-rim: #fff; --art-dish: rgba(255, 255, 255, 0.85); }
+.art-svg { position: absolute; inset: 6% 6% 0; width: 88%; height: 94%; overflow: visible; }
+.art-svg .a-shadow { fill: rgba(92, 60, 30, 0.12); }
+.art-svg .a-dish { fill: var(--art-dish); stroke: rgba(92, 60, 30, 0.14); stroke-width: 1.2; }
+.art-svg .a-rim { fill: var(--art-rim); stroke: rgba(92, 60, 30, 0.12); stroke-width: 1; }
+.art-svg .a-accent { fill: var(--art-accent); stroke: var(--art-accent); stroke-width: 0; }
+.art-svg path.a-accent[fill="none"] { stroke-width: 3; fill: none; }
+.art-svg .a-line { stroke: rgba(92, 60, 30, 0.14); stroke-width: 1.4; stroke-linecap: round; }
+.art-svg .a-wood { fill: #e7b77f; stroke: #c9925a; stroke-width: 1.2; }
+.art-svg .a-glass { fill: var(--art-dish); stroke: rgba(92, 60, 30, 0.18); stroke-width: 1.2; }
+.art-svg .a-straw { stroke: #e0703a; stroke-width: 4; stroke-linecap: round; }
+.art-svg .a-steam { stroke: rgba(160, 120, 90, 0.35); stroke-width: 3; stroke-linecap: round; animation: steam 2.4s ease-in-out infinite; }
+.art-svg .a-steam.s2 { animation-delay: 0.6s; }
+.art-svg .a-steam.s3 { animation-delay: 1.2s; }
+@keyframes steam { 0%, 100% { opacity: 0.2; transform: translateY(4px); } 50% { opacity: 0.9; transform: translateY(-3px); } }
+.art-emoji {
+  position: relative; z-index: 1; margin-top: -8%;
+  font-family: var(--emoji-font); font-size: calc(var(--art-size, 56px) * 0.5); line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(92, 60, 30, 0.18));
+}
+.food-art.kind-cup .art-emoji { margin-top: 18%; font-size: calc(var(--art-size, 56px) * 0.36); }
+.food-art.kind-soup .art-emoji, .food-art.kind-bowl .art-emoji, .food-art.kind-rice .art-emoji { margin-top: 0; }
+.food-art.art-sm { --art-size: 46px; }
+.food-art.art-md { --art-size: 60px; }
+.food-art.art-lg { --art-size: 128px; border-radius: 34%; box-shadow: 0 10px 24px rgba(92, 60, 30, 0.16), inset 0 -4px 0 rgba(0, 0, 0, 0.04); }
+
+/* 今日のカードの絵 */
+.dish-card .dish-cat { width: auto; height: auto; background: none; border-radius: 0; }
+.dish-card .dish-cat .food-art { transition: transform 0.2s var(--ease-pop); }
+.dish-card:hover .food-art { transform: rotate(-4deg) scale(1.04); }
+.dish-card { overflow: hidden; }
+.dish-card::after {
+  content: ""; position: absolute; right: -30px; top: -30px; width: 90px; height: 90px; border-radius: 50%;
+  background: var(--accent-soft, var(--surface-2)); opacity: 0.45; pointer-events: none;
+}
+.dish-card > * { position: relative; z-index: 1; }
+
+/* レシピ一覧・冷蔵庫の小さな絵 */
+.food-art.emoji-circle { margin-left: 10px; border-radius: 30%; }
+.fridge-result-main .food-art.emoji-circle { margin-left: 0; }
+
+/* レシピ詳細のヘッダー */
+.recipe-hero {
+  --hero1: #fff3e6; --hero2: #ffd9bd;
+  position: relative; display: grid; place-items: center; height: 170px; margin: -4px 0 12px;
+  border-radius: 22px; overflow: hidden;
+  background: linear-gradient(145deg, var(--hero1), var(--hero2));
+}
+.recipe-hero.tone-side { --hero1: #f3faec; --hero2: #cfe8bd; }
+.recipe-hero.tone-soup { --hero1: #fff8e6; --hero2: #f2dcaa; }
+.recipe-hero.tone-staple { --hero1: #fffaf0; --hero2: #f3e0b6; }
+.recipe-hero.tone-drink { --hero1: #fff3f7; --hero2: #f7cddb; }
+.hero-deco { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-deco .d-dot { fill: rgba(255, 255, 255, 0.5); }
+.hero-deco .d-dot.small { fill: rgba(255, 255, 255, 0.7); }
+.hero-deco .d-sparkle, .today-deco .d-sparkle { fill: #ffffff; opacity: 0.9; animation: twinkle 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.hero-deco .d-sparkle.s2, .today-deco .d-sparkle.s2 { animation-delay: 0.8s; }
+.hero-deco .d-sparkle.s3, .today-deco .d-sparkle.s3 { animation-delay: 1.6s; }
+.hero-deco .d-leaf, .today-deco .d-leaf { fill: #9fcb85; stroke: #7fae66; opacity: 0.8; }
+@keyframes twinkle { 0%, 100% { opacity: 0.35; scale: 0.7; } 50% { opacity: 1; scale: 1.1; } }
+.recipe-hero .food-art { animation: hero-float 3.2s ease-in-out infinite; }
+@keyframes hero-float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-6px) rotate(2deg); } }
+.meal-fit { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.meal-fit-chip { padding: 1px 8px; border-radius: 999px; background: #fff4df; color: #8a5a10; font-size: 12px; font-weight: 700; }
+.today-targets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--primary-soft); }
+.today-targets-label { width: 100%; font-size: 13px; font-weight: 800; color: var(--primary-dark); }
+.today-targets .btn { flex: 1 1 auto; min-height: 44px; padding: 0 12px; font-size: 14px; }
+
+/* ---------- 今日のヘッダー（ロゴ・グラデーション・飾り） ---------- */
+body[data-route="today"] .app-header {
+  background: linear-gradient(180deg, #ffe8d2 0%, rgba(255, 238, 222, 0.94) 100%);
+}
+body[data-route="today"] .app-logo { font-size: clamp(23px, 6.9vw, 30px); }
+body[data-route="today"] .app-logo .logo-text {
+  background: linear-gradient(90deg, #d8582a 0%, #e0703a 45%, #d9486a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none;
+}
+body[data-route="today"] .logo-mark { display: inline-block; animation: logo-bob 3s ease-in-out infinite; transform-origin: 50% 80%; }
+@keyframes logo-bob { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg) translateY(-2px); } }
+.logo-tagline { display: none; font-size: 11px; font-weight: 700; color: #b0673f; letter-spacing: 0.08em; line-height: 1.2; }
+body[data-route="today"] .logo-tagline { display: block; }
+body[data-route="today"] .view { background: linear-gradient(180deg, #ffeedd 0, var(--bg) 220px); max-width: none; }
+body[data-route="today"] .view > .page { max-width: 448px; margin: 0 auto; }
+
+.today-hero {
+  position: relative; overflow: hidden; padding: 16px 16px 22px; border-radius: 24px;
+  background: linear-gradient(135deg, #fff6ea 0%, #ffe2c8 55%, #ffcfb8 100%);
+  box-shadow: 0 6px 18px rgba(224, 112, 58, 0.14);
+}
+.today-deco { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.today-deco .d-sun { fill: rgba(255, 255, 255, 0.45); }
+.today-deco .d-wave { fill: rgba(255, 255, 255, 0.55); }
+.hero-row { position: relative; display: flex; align-items: center; gap: 8px; }
+.hero-text { flex: 1; min-width: 0; }
+.today-hero .today-date { font-size: clamp(22px, 6.4vw, 26px); color: #4a2e1c; }
+.today-hero .today-lead { color: #8a5a3c; font-weight: 700; }
+.hero-meals { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.hero-meal { padding: 1px 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.75); font-size: 12px; font-weight: 800; color: #8a4a22; }
+.hero-meal.off { opacity: 0.5; text-decoration: line-through; }
+.mascot { flex-shrink: 0; width: clamp(72px, 22vw, 96px); height: auto; animation: mascot-hop 2.8s ease-in-out infinite; transform-origin: 40% 90%; }
+@keyframes mascot-hop { 0%, 100% { transform: translateY(0) rotate(-3deg); } 40% { transform: translateY(-5px) rotate(3deg); } 60% { transform: translateY(0) rotate(0); } }
+.mascot .m-handle { fill: #7a5236; }
+.mascot .m-pan { fill: #5a4a42; }
+.mascot .m-pan-in { fill: #6e5c52; }
+.mascot .m-white { fill: #fffdf7; }
+.mascot .m-yolk { fill: #ffc233; }
+.mascot .m-eye { fill: #4a2e1c; }
+.mascot .m-smile { stroke: #4a2e1c; stroke-width: 1.2; stroke-linecap: round; }
+.mascot .m-cheek { fill: #ff8a7a; opacity: 0.8; }
+.mascot .m-steam { stroke: rgba(160, 110, 80, 0.45); stroke-width: 2.2; stroke-linecap: round; animation: steam 2.4s ease-in-out infinite; }
+
+/* ---------- 今日：食事ごとのセクション ---------- */
+.meal-sections { display: flex; flex-direction: column; gap: 12px; }
+.meal-section { border-radius: 20px; background: rgba(255, 255, 255, 0.6); border: 1.5px solid #f1e3d2; overflow: hidden; }
+.meal-section[open] { background: #fffaf4; }
+.meal-section.meal-breakfast { --meal-tint: #fff4d6; --meal-ink: #a0660c; }
+.meal-section.meal-lunch { --meal-tint: #e6f4ff; --meal-ink: #2f6a9a; }
+.meal-section.meal-bento { --meal-tint: #ffe8ec; --meal-ink: #b04462; }
+.meal-section.meal-dinner { --meal-tint: #ece8ff; --meal-ink: #5a4aa8; }
+.meal-head {
+  display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px;
+  list-style: none; cursor: pointer; background: linear-gradient(90deg, var(--meal-tint), transparent 85%);
+}
+.meal-head::-webkit-details-marker { display: none; }
+.meal-emoji { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 14px; background: #fff; font-family: var(--emoji-font); font-size: 22px; box-shadow: var(--shadow); }
+.meal-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.meal-titles b { font-size: 16px; font-weight: 900; color: var(--meal-ink, var(--text)); }
+.meal-titles small { font-size: 12px; color: var(--text-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meal-kcal { flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--text-sub); background: #fff; border-radius: 999px; padding: 1px 8px; }
+.meal-chevron { display: inline-flex; color: var(--text-sub); transition: transform 0.25s var(--ease-pop); }
+.meal-section[open] .meal-chevron { transform: rotate(90deg); }
+.meal-section[open] .meal-sub { display: none; }
+.meal-body { padding: 4px 10px 12px; }
+.meal-section[open] .meal-body { animation: meal-open 0.3s ease; }
+@keyframes meal-open { from { opacity: 0; transform: translateY(-6px); } }
+.meal-body .dish-card { min-height: 88px; }
+.meal-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text-sub); }
+.meal-foot-info { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.meal-foot-info .sep { color: var(--line); }
+.meal-foot-info small { font-size: 11px; }
+.meal-section.is-off { background: repeating-linear-gradient(135deg, #fff 0 10px, #fbf3ea 10px 20px); }
+.meal-section.is-off .meal-head { cursor: default; }
+.meal-hint { text-align: center; margin-top: -4px; }
+.day-total .dt-rows { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 8px; }
+.day-total .dt-rows li { display: grid; grid-template-columns: 7.5em 1fr auto; align-items: center; gap: 8px; font-size: 13px; }
+.dt-label { font-weight: 800; white-space: nowrap; }
+.dt-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.dt-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffc38f, var(--primary)); }
+.dt-kcal { font-weight: 700; white-space: nowrap; }
+.dt-kcal small { margin-left: 3px; font-size: 11px; color: var(--text-sub); }
+.tomorrow-list { display: flex; flex-direction: column; gap: 4px; font-size: 14px; margin-bottom: 4px; }
+.tomorrow-list li { display: flex; gap: 8px; }
+.tm-label { flex-shrink: 0; font-weight: 800; width: 3.6em; }
+
+/* ---------- 1週間：食事タブ ---------- */
+.segmented.meal-tabs span { display: flex; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 14px; white-space: nowrap; padding: 0 2px; }
+.segmented.meal-tabs i { font-style: normal; font-family: var(--emoji-font); }
+.segmented span { transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-pop); }
+.segmented input:checked + span { animation: tab-pick 0.3s var(--ease-pop); }
+@keyframes tab-pick { 0% { transform: scale(0.94); } 100% { transform: scale(1); } }
+.week-meal { display: inline-flex; align-items: center; gap: 2px; margin-right: 8px; padding: 0 8px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: 13px; }
+.week-all-avg { font-size: 12px; color: var(--text-sub); }
+.day-card.is-off { padding-top: 8px; padding-bottom: 8px; background: repeating-linear-gradient(135deg, #fff 0 10px, #fbf3ea 10px 20px); }
+.off-note { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text-sub); }
+.tab-enter-left { animation: tab-in-left 0.28s ease both; }
+.tab-enter-right { animation: tab-in-right 0.28s ease both; }
+@keyframes tab-in-left { from { opacity: 0; transform: translateX(24px); } }
+@keyframes tab-in-right { from { opacity: 0; transform: translateX(-24px); } }
+
+/* ---------- 設定：食事 ---------- */
+.title-emoji { font-family: var(--emoji-font); margin-right: 4px; }
+.meal-settings { display: flex; flex-direction: column; background: var(--surface-2); border-radius: 16px; padding: 4px 12px; }
+.meal-settings .switch-row + .switch-row, .meal-settings .meal-sub-settings + .switch-row { border-top: 1px solid var(--line); }
+.meal-switch.is-fixed { cursor: default; }
+.meal-switch.is-fixed .switch { opacity: 0.55; }
+.meal-sub-settings { padding: 0 0 8px 12px; border-left: 3px solid var(--primary-soft); margin: 0 0 6px 4px; }
+.meal-sub-settings .switch-row { min-height: 44px; }
+.day-chips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day-chip { position: relative; }
+.day-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.day-chip span { display: grid; place-items: center; min-height: 40px; border-radius: 12px; background: var(--surface); border: 1.5px solid var(--line); font-weight: 800; font-size: 14px; cursor: pointer; transition: background 0.15s, transform 0.2s var(--ease-pop); }
+.day-chip.sun span { color: #c9483b; }
+.day-chip.sat span { color: #3b6fc9; }
+.day-chip input:checked + span { background: var(--primary); border-color: var(--primary); color: #fff; transform: scale(1.04); }
+.day-chip input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+.segmented.cat-seg span { font-size: 13px; min-height: 40px; text-align: center; padding: 0 2px; }
+.meal-checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.meal-check { position: relative; }
+.meal-check input { position: absolute; opacity: 0; pointer-events: none; }
+.meal-check span { display: grid; place-items: center; min-height: 42px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 800; font-size: 14px; cursor: pointer; }
+.meal-check input:checked + span { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-dark); }
+.meal-check input:focus-visible + span { outline: 2px solid var(--primary); }
+.shop-meals { font-size: 12px; color: var(--text-sub); }
+.all-done { margin-left: 6px; font-weight: 800; color: var(--cat-side); animation: pop-in 0.4s var(--ease-pop); display: inline-block; }
+
+/* ---------- アニメーション ---------- */
+/* 画面を開いたとき：カードが順番にふわっと入る */
+.page-enter { animation: page-in 0.3s ease both; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+.page-enter .dish-card, .page-enter .day-card, .page-enter .meal-section, .page-enter .recipe-row, .page-enter .fridge-result, .page-enter .shop-group, .page-enter .today-hero {
+  animation: card-in 0.42s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+  animation-delay: calc(min(var(--i, 0), 6) * 45ms + 30ms);
+}
+.page-enter .meal-section:nth-child(2) { --i: 1; }
+.page-enter .meal-section:nth-child(3) { --i: 2; }
+.page-enter .meal-section:nth-child(4) { --i: 3; }
+@keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+
+/* 入れ替え：ボタンがくるっと回り、カードがシャッフルして絵がスピン */
+.reroll-btn:not(.is-locked):active { transform: rotate(-200deg); transition: transform 0.35s var(--ease-pop); }
+.reroll-btn:not(.is-locked):hover .icon { transform: rotate(-45deg); transition: transform 0.25s; }
+.dish-card.rerolled { animation: shuffle-in 0.55s var(--ease-pop); }
+.dish-card.rerolled .food-art { animation: art-spin 0.6s var(--ease-pop); }
+.dish-card.rerolled .reroll-btn .icon { animation: icon-spin 0.5s ease; }
+@keyframes shuffle-in {
+  0% { transform: translateX(-18px) rotate(-2deg) scale(0.96); opacity: 0.3; }
+  45% { transform: translateX(10px) rotate(1.5deg); opacity: 1; }
+  75% { transform: translateX(-4px) rotate(-0.5deg); }
+  100% { transform: none; }
+}
+@keyframes art-spin { 0% { transform: rotate(-270deg) scale(0.4); } 70% { transform: rotate(15deg) scale(1.1); } 100% { transform: none; } }
+@keyframes icon-spin { from { transform: rotate(360deg); } }
+
+/* 星評価：押した星がぽんと弾む */
+.star-btn .icon { transition: transform 0.15s; }
+.star-btn.pop .icon { animation: star-pop 0.5s var(--ease-pop) both; animation-delay: calc(var(--i, 0) * 60ms); }
+@keyframes star-pop { 0% { transform: scale(0.4) rotate(-30deg); } 60% { transform: scale(1.35) rotate(8deg); } 100% { transform: none; } }
+.star-btn.pop::after { content: none; }
+.fav-toggle.pop .icon, .fav-btn:active .icon { animation: star-pop 0.5s var(--ease-pop); }
+.sheet.no-enter, .sheet-backdrop.no-enter { animation: none; }
+
+/* 買い物リスト：チェックがぴょんと弾んで線が引かれる */
+.checkbox .icon path { stroke-dasharray: 24; stroke-dashoffset: 0; }
+.shop-item.just-checked .checkbox { animation: check-bounce 0.45s var(--ease-pop); }
+.shop-item.just-checked .checkbox .icon path { animation: check-draw 0.35s ease 0.05s both; }
+.shop-item.just-checked .item-name { animation: fade-strike 0.4s ease; }
+@keyframes check-bounce { 0% { transform: scale(0.6); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes check-draw { from { stroke-dashoffset: 24; } }
+@keyframes fade-strike { from { color: var(--text); } }
+.progress-bar { animation: progress-grow 0.45s ease; }
+@keyframes progress-grow { from { width: var(--from, 0%); } }
+@keyframes pop-in { from { transform: scale(0.5); opacity: 0; } }
+
+/* 動きを減らす設定では、アニメーションを止める */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .art-svg .a-steam { opacity: 0.6; }
+}

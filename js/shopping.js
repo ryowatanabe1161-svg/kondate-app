@@ -79,14 +79,14 @@ export function mergeAmounts(amounts, factor = 1) {
 }
 
 /**
- * @param {Array<{main, side, soup}>} days レシピに解決済みの献立
+ * @param {Array<{recipes?: object[], main?, side?, soup?}>} days レシピに解決済みの献立（recipes があればすべての食事の料理）
  * @param {number} factor 分量の倍率（人数 / 2）
  * @returns {Array<{ name: string, items: Array<{ name, amount, dishes: string[] }> }>}
  */
 export function buildShoppingList(days, factor = 1) {
   const byName = new Map();
   for (const day of days) {
-    for (const recipe of [day.main, day.side, day.soup]) {
+    for (const recipe of day.recipes || [day.main, day.side, day.soup]) {
       if (!recipe) continue;
       for (const ing of recipe.ingredients || []) {
         const name = ing.name.trim();

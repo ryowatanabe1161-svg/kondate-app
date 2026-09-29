@@ -11,6 +11,8 @@ import { showWeek } from './week.js';
 
 let seasoningOpen = false;
 let shopWeek = 'this'; // 表示中の週（'this' | 'next'）
+let justChecked = ''; // 直前にチェックした項目（アニメーション用）
+let lastProgress = null; // 直前の進み具合（%）
 
 function weekTabs() {
   return `
@@ -22,7 +24,7 @@ function weekTabs() {
 
 function itemRow({ key, name, amount, dishes, checked, removable }) {
   return `
-    <li class="shop-item ${checked ? 'checked' : ''}">
+    <li class="shop-item ${checked ? 'checked' : ''} ${checked && key === justChecked ? 'just-checked' : ''}">
       <label class="shop-label">
         <input type="checkbox" class="visually-hidden" data-check="${esc(key)}" ${checked ? 'checked' : ''}>
         <span class="checkbox" aria-hidden="true">${icon('check', { size: 16 })}</span>
@@ -41,6 +43,7 @@ export function renderShopping(container, { rerender }) {
     const tab = e.target.closest('input[name=shopWeek]');
     if (!tab) return;
     shopWeek = tab.value;
+    lastProgress = null;
     rerender();
   });
   const week = shopWeek === 'next' && actions.getNextPlan() ? 'next' : shopWeek;
@@ -57,7 +60,8 @@ export function renderShopping(container, { rerender }) {
     container.querySelector('[data-go-next]').addEventListener('click', () => showWeek('next'));
     return;
   }
-  const days = actions.resolvedDays(week);
+  const days = actions.allMealsDays(week); // 献立を作るすべての食事（朝・昼・お弁当・夕）をまとめる
+  const meals = actions.enabledMeals();
   const servings = store.getServings();
   const groups = buildShoppingList(days, store.servingFactor());
   const shopping = store.getShopping(week);
@@ -69,6 +73,9 @@ export function renderShopping(container, { rerender }) {
     groups.reduce((s, g) => s + g.items.filter((i) => checked.has(i.name)).length, 0) +
     extras.filter((x) => x.checked).length;
 
+  const progress = total ? (done / total) * 100 : 0;
+  const fromProgress = lastProgress ?? progress;
+  lastProgress = progress;
   const groupHtml = groups
     .map((g) => {
       const doneInGroup = g.items.filter((i) => checked.has(i.name)).length;
@@ -102,9 +109,10 @@ export function renderShopping(container, { rerender }) {
         <button class="servings-chip" data-settings aria-label="人数を変更（現在${servings}人分）">${icon('user', { size: 14 })}${servings}人分</button>
       </div>
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
-        <div class="progress-bar" style="width:${total ? (done / total) * 100 : 0}%"></div>
+        <div class="progress-bar" style="width:${progress}%; --from:${fromProgress}%"></div>
       </div>
-      <p class="progress-label"><b>${done}</b> / ${total} 品 チェック済み</p>
+      <p class="progress-label"><b>${done}</b> / ${total} 品 チェック済み${total && done === total ? ' <span class="all-done">🎉 ぜんぶそろいました</span>' : ''}</p>
+      ${meals.length > 1 ? `<p class="shop-meals">${meals.map((m) => `${actions.mealDef(m).emoji}${esc(actions.mealDef(m).short)}`).join('・')}の分をまとめています</p>` : ''}
     </section>
 
     ${groupHtml}
@@ -135,7 +143,9 @@ export function renderShopping(container, { rerender }) {
       current.checked = [...set];
     }
     store.setShopping(current, week);
+    justChecked = box.checked ? key : '';
     rerender();
+    justChecked = '';
   });
 
   container.addEventListener('click', (e) => {

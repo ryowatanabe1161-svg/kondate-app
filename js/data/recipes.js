@@ -1,8 +1,9 @@
 // 組み込みレシピ（分量はすべて2人分の目安）
 //
 // R(id, 料理名, 種類, 主な食材, ジャンル, 調理時間(分), カロリー(kcal/1人分), 絵文字, タグ, 材料, 作り方, コツ・ポイント)
-//  - 種類: 主菜 / 副菜 / 汁物
-//  - 主な食材: 肉 / 魚 / 卵・豆腐 / 麺・丼 / 野菜 / 海藻・きのこ / その他
+//  - 種類: 主菜 / 副菜 / 汁物 / 主食 / 飲み物・デザート
+//  - 食事: 夕ごはん用が基本。朝ごはん・昼ごはん・お弁当にも使う料理は MEAL_TAGS で追加（新しい料理は recipes-meals.js）
+//  - 主な食材: 肉 / 魚 / 卵・豆腐 / 麺・丼 / ご飯・パン / 野菜 / 海藻・きのこ / その他
 //  - ジャンル: 和 / 洋 / 中 / その他（韓国・エスニックなど）
 //  - タグ: スペース区切り。調理時間20分以内には「時短」が自動で付きます
 //  - 材料: 「材料名 分量」を「、」で区切る。分量の書き方をそろえると買い物リストで合算されます
@@ -12,14 +13,16 @@
 // ※ b01〜b48 は初期バージョンからのID。保存済みの献立・お気に入りが参照するので変えないこと。
 
 import { NUTRIENTS } from './nutrients.js';
+import { mealRecipes } from './recipes-meals.js';
+import { recipeMeals } from '../meals.js';
 
-export const CATEGORIES = ['主菜', '副菜', '汁物'];
-export const MAIN_INGREDIENTS = ['肉', '魚', '卵・豆腐', '麺・丼', '野菜', '海藻・きのこ', 'その他'];
+export const CATEGORIES = ['主菜', '副菜', '汁物', '主食', '飲み物・デザート'];
+export const MAIN_INGREDIENTS = ['肉', '魚', '卵・豆腐', '麺・丼', 'ご飯・パン', '野菜', '海藻・きのこ', 'その他'];
 export const CUISINES = ['和', '洋', '中', 'その他'];
 export const TAGS = ['時短', '定番', '作り置き', '節約', 'ヘルシー', '子ども向け', 'お弁当', 'ボリューム'];
 export const QUICK_MINUTES = 20;
 
-const DEFAULT_EMOJI = { 主菜: '🍽️', 副菜: '🥗', 汁物: '🥣' };
+const DEFAULT_EMOJI = { 主菜: '🍽️', 副菜: '🥗', 汁物: '🥣', 主食: '🍚', '飲み物・デザート': '🥛' };
 
 function parseIngredients(text) {
   return text
@@ -50,6 +53,7 @@ export function normalizeRecipe(r) {
     ingredients: r.ingredients || [],
     steps: r.steps || [],
     tips: Array.isArray(r.tips) ? r.tips : [],
+    meals: recipeMeals(r),
   };
 }
 
@@ -1540,8 +1544,25 @@ const RAW_RECIPES = [
     ['味噌を溶いてから卵を入れると、卵がふわっと仕上がります。']),
 ];
 
-/** 組み込みレシピ（栄養の目安 pfc: {p, f, c} g/1人分 を付けたもの） */
-export const BUILTIN_RECIPES = RAW_RECIPES.map((r) => {
+// 夕ごはん用の料理のうち、朝ごはん・昼ごはん・お弁当にも使うもの（夕ごはんにもそのまま使う）
+const MEAL_TAGS = {
+  breakfast: ['b08', 'b30', 'b27', 'b20', 'b216', 'b204', 'b40', 'b41', 'b42', 'b45', 'b256', 'b240', 'b242'],
+  lunch: [
+    // 一品（麺・丼・パスタ）
+    'b18', 'b164', 'b165', 'b166', 'b168', 'b169', 'b170', 'b171', 'b172', 'b174', 'b175',
+    // 小鉢・スープ
+    'b204', 'b203', 'b209', 'b28', 'b31', 'b217', 'b205', 'b24', 'b40', 'b47', 'b245', 'b247', 'b240', 'b242',
+  ],
+  bento: [
+    'b02', 'b03', 'b05', 'b08', 'b10', 'b101', 'b112', 'b117', 'b119', 'b134', 'b139',
+    'b30', 'b20', 'b21', 'b22', 'b25', 'b29', 'b32', 'b202', 'b206', 'b208', 'b212', 'b216', 'b219',
+  ],
+};
+
+/** 組み込みレシピ（使える食事 meals と、栄養の目安 pfc: {p, f, c} g/1人分 を付けたもの） */
+export const BUILTIN_RECIPES = [...RAW_RECIPES.map((r) => ({ ...r, meals: ['dinner'] })), ...mealRecipes(R)].map((r) => {
+  const meals = [...r.meals];
+  for (const [meal, ids] of Object.entries(MEAL_TAGS)) if (ids.includes(r.id) && !meals.includes(meal)) meals.push(meal);
   const n = NUTRIENTS[r.id];
-  return n ? { ...r, pfc: { p: n[0], f: n[1], c: n[2] } } : r;
+  return { ...r, meals, ...(n ? { pfc: { p: n[0], f: n[1], c: n[2] } } : {}) };
 });

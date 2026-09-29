@@ -26,7 +26,7 @@ function currentRoute() {
   return ROUTES[key] ? key : 'today';
 }
 
-function render() {
+function render({ enter = false } = {}) {
   const key = currentRoute();
   const route = ROUTES[key];
 
@@ -42,21 +42,21 @@ function render() {
 
   // 毎回新しい要素に描画する（イベントリスナーが重複しないように）
   const page = document.createElement('div');
-  page.className = `page page-${key}`;
+  page.className = `page page-${key}${enter ? ' page-enter' : ''}`; // 画面を切り替えたときだけ入場アニメーション
   const headerAction = document.createElement('div');
   viewEl.replaceChildren(page);
   headerActionEl.replaceChildren(headerAction);
 
-  route.render(page, { rerender: render, headerAction });
+  route.render(page, { rerender: () => render(), headerAction });
 }
 
 window.addEventListener('hashchange', () => {
   closeSheet();
-  render();
+  render({ enter: true });
   window.scrollTo(0, 0);
 });
 
-render();
+render({ enter: true });
 
 // PWA：オフラインでも開けるように Service Worker を登録
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

@@ -3,21 +3,25 @@
 import * as store from '../store.js';
 import { esc } from '../lib/util.js';
 import { closeSheet, icon, openSheet, stars } from '../lib/ui.js';
+import { mealPool } from '../meals.js';
 
 /**
  * @param {object} opts
  * @param {string} opts.title
- * @param {string} opts.category '主菜' | '副菜' | '汁物'
+ * @param {string} opts.category 表示用の枠の名前（'主菜' など）
+ * @param {string} [opts.meal] 食事（'dinner' など）。slot と一緒に渡すとその枠に合うレシピだけを出す
+ * @param {string} [opts.slot] 枠（'main' など）
  * @param {string|null} opts.currentId
  * @param {(id: string) => void} opts.onPick
  * @param {() => void} opts.onRandom
  * @param {boolean} [opts.locked] この料理が固定されているか
  * @param {() => boolean} [opts.onToggleLock] 固定の切り替え（新しい状態を返す）。なければ固定の欄を出さない
  */
-export function openRecipePicker({ title, category, currentId, onPick, onRandom, locked = false, onToggleLock }) {
-  const recipes = store
-    .allRecipes()
-    .filter((r) => r.category === category)
+export function openRecipePicker({ title, category, meal, slot, currentId, onPick, onRandom, locked = false, onToggleLock }) {
+  const all = store.allRecipes();
+  const pool = meal && slot ? mealPool(all, meal, slot) : all.filter((r) => r.category === category);
+  const recipes = pool
+    .slice()
     .sort((a, b) => Number(b.fav) - Number(a.fav) || b.rating - a.rating); // お気に入り → 評価の高い順
 
   const items = recipes

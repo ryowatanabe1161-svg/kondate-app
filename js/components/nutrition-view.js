@@ -39,6 +39,34 @@ export function mealNutritionCard(meal) {
     </section>`;
 }
 
+/**
+ * 今日の画面（複数の食事）：1日の合計カード
+ * @param {{def: object, meal: string, n: object}[]} perMeal 各食事の目安
+ * @param {object} total すべての料理をまとめた目安（mealNutrition）
+ */
+export function dayTotalCard(perMeal, total) {
+  const kcal = perMeal.reduce((s, m) => s + m.n.kcal, 0);
+  const unknown = perMeal.some((m) => m.n.unknown);
+  const noRice = perMeal.filter((m) => !m.n.staple);
+  const rows = perMeal
+    .map((m) => `<li data-meal-row="${m.meal}"><span class="dt-label">${m.def.emoji}${esc(m.def.label)}</span><span class="dt-bar"><i style="width:${kcal ? Math.round((m.n.kcal / kcal) * 100) : 0}%"></i></span><span class="dt-kcal">約${m.n.kcal}kcal${m.n.staple ? '' : '<small>ご飯別</small>'}</span></li>`)
+    .join('');
+  return `
+    <section class="card nutri-card day-total" aria-label="今日の合計のカロリー・栄養の目安">
+      <h3 class="section-title">今日の合計の目安 <small>1人分</small></h3>
+      <p class="nutri-kcal">約<b data-meal-kcal="${kcal}">${kcal}${unknown ? '＋α' : ''}</b>kcal
+        ${noRice.length ? `<span class="nutri-rice">ご飯（1膳${RICE_KCAL}kcal）を足すと 約${kcal + RICE_KCAL * noRice.length}kcal</span>` : ''}</p>
+      <ul class="dt-rows">${rows}</ul>
+      <p class="nutri-pfc">
+        <span>たんぱく質 <b>${total.pfc.p}</b>g</span>
+        <span>脂質 <b>${total.pfc.f}</b>g</span>
+        <span>炭水化物 <b>${total.pfc.c}</b>g</span>
+      </p>
+      ${balancePills(total)}
+      <p class="nutri-note">※ レシピのデータから計算した大まかな目安です。◎しっかり ○まずまず △少なめ</p>
+    </section>`;
+}
+
 /** 1週間の画面：各日の1行表示 */
 export function dayNutritionLine(meal) {
   return `
@@ -51,20 +79,21 @@ export function dayNutritionLine(meal) {
 }
 
 /** 1週間の画面：週のまとめ */
-export function weekNutritionSummary(week) {
+export function weekNutritionSummary(week, { title = 'カロリー・栄養の目安', note = '1人分・ご飯別', pills = true, allAvg = null } = {}) {
   const level = (n) => (n >= week.days - 1 ? 'good' : n >= Math.ceil(week.days / 2) ? 'ok' : 'low');
   return `
     <div class="week-nutri" aria-label="1週間の栄養の目安">
-      <p class="week-nutri-title">カロリー・栄養の目安 <small>1人分・ご飯別</small></p>
+      <p class="week-nutri-title">${esc(title)} <small>${esc(note)}</small></p>
       <div class="week-kcal">
         <span>1日平均 約<b data-week-avg="${week.avgKcal}">${week.avgKcal}</b>kcal</span>
         <span>${week.days}日合計 約<b data-week-total="${week.totalKcal}">${week.totalKcal}</b>kcal</span>
       </div>
       <p class="nutri-pfc small">1日平均 たんぱく質 <b>${week.avgPfc.p}</b>g・脂質 <b>${week.avgPfc.f}</b>g・炭水化物 <b>${week.avgPfc.c}</b>g</p>
-      <div class="bal-row">
+      ${allAvg !== null ? `<p class="week-all-avg">すべての食事の合計 1日平均 約<b data-week-all-avg="${allAvg}">${allAvg}</b>kcal</p>` : ''}
+      ${pills ? `<div class="bal-row">
         ${pill('protein', 'たんぱく質', level(week.proteinDays), `${week.proteinDays}/${week.days}日`)}
         ${pill('vegetable', '野菜3種以上', level(week.vegDays), `${week.vegDays}/${week.days}日・平均${week.avgVegKinds}種`)}
         ${pill('carb', '麺・丼', week.stapleDays <= 2 ? 'good' : 'ok', `${week.stapleDays}日`)}
-      </div>
+      </div>` : ''}
     </div>`;
 }

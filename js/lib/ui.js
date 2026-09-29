@@ -48,7 +48,7 @@ export function starInput(rating, { size = 30 } = {}) {
 }
 
 // ---- カテゴリ表示 ----
-const CATEGORY_CLASS = { 主菜: 'cat-main', 副菜: 'cat-side', 汁物: 'cat-soup' };
+const CATEGORY_CLASS = { 主菜: 'cat-main', 副菜: 'cat-side', 汁物: 'cat-soup', 主食: 'cat-staple', '飲み物・デザート': 'cat-drink' };
 
 export function categoryBadge(category) {
   return `<span class="badge ${CATEGORY_CLASS[category] || ''}">${esc(category)}</span>`;

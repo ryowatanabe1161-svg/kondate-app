@@ -5,8 +5,12 @@
 //   avoid      : できれば使わないレシピIDの集合（例：来週を作るときの今週の料理）
 //   base       : 作り直す前の献立。固定（locked / lockedSlots）された日・料理はそのまま残す
 //   report     : 配列を渡すと、条件をゆるめたときの理由を push する（画面のトースト用）
+//
+// 夕ごはんは generateWeek など（主菜の食材の偏り・ジャンルの並びまで調整）、
+// 朝ごはん・昼ごはん・お弁当は generateMealWeek など（食事ごとの枠・ジャンルの相性・週内の重複回避）で作る。
 
 import { addDays, shuffle, uid, weekdayIndex, weightedPick } from './lib/util.js';
+import { MEALS, mealPool, recipeMeals } from './meals.js';
 
 export const PLAN_DAYS = 7;
 
@@ -59,7 +63,7 @@ export function isQuickDay(dateKey, conditions) {
 }
 
 /** 条件の「好み」を反映した重み（節約・ヘルシー・ジャンル） */
-function preferenceWeight(r, c) {
+function preferenceWeight(r, c, primary = r.category === '主菜') {
   let w = 1;
   const names = (r.ingredients || []).map((i) => i.name).join(' ');
   const tags = r.tags || [];
@@ -71,45 +75,51 @@ function preferenceWeight(r, c) {
   if (c.healthy) {
     if (tags.includes('ヘルシー')) w *= 3;
     if (FRIED.test(r.name)) w *= 0.25;
-    const base = { 主菜: 380, 副菜: 110, 汁物: 90 }[r.category] || 200;
+    const base = { 主菜: 380, 副菜: 110, 汁物: 90, 主食: 250, '飲み物・デザート': 120 }[r.category] || 200;
     if (Number(r.kcal) > 0) w *= Math.min(3, Math.max(0.2, (base / r.kcal) ** 1.5));
   }
-  if (c.cuisinePref !== 'none' && r.category === '主菜') {
+  if (c.cuisinePref !== 'none' && primary) {
     w *= r.cuisine === c.cuisinePref ? 3.5 : 0.7;
   }
   return w;
 }
 
-/** 時間・カロリーの上限を計算するための、各枠の最小値 */
-function poolMinimums(recipes) {
-  const min = (slot, f) => {
-    const vals = poolFor(recipes, slot).map(f).filter((v) => Number.isFinite(v));
+/** 時間・カロリーの上限を計算するための、各枠の最小値（pools: { 枠: レシピ配列 }） */
+function minimumsOf(pools) {
+  const min = (list, f) => {
+    const vals = list.map(f).filter((v) => Number.isFinite(v));
     return vals.length ? Math.min(...vals) : 0;
   };
+  const entries = Object.entries(pools);
   return {
-    time: Object.fromEntries(SLOTS.map(({ key }) => [key, min(key, (r) => Number(r.time) || 0)])),
-    kcal: Object.fromEntries(SLOTS.map(({ key }) => [key, min(key, (r) => Number(r.kcal) || 0)])),
+    time: Object.fromEntries(entries.map(([key, list]) => [key, min(list, (r) => Number(r.time) || 0)])),
+    kcal: Object.fromEntries(entries.map(([key, list]) => [key, min(list, (r) => Number(r.kcal) || 0)])),
   };
+}
+
+function poolMinimums(recipes) {
+  return minimumsOf(Object.fromEntries(SLOTS.map(({ key }) => [key, poolFor(recipes, key)])));
 }
 
 /**
  * ある日・ある枠のレシピが満たすべき「必須条件」（時短・カロリー目標）。
  * others: その日のほかの枠のレシピ（まだ決まっていない枠は最小値で見積もる）
  */
-function hardCondition(c, dateKey, slot, others, mins) {
+function hardCondition(c, dateKey, slot, others, mins, slots = SLOTS, meal = 'dinner') {
   const checks = [];
   const reasons = [];
+  const primary = meal === 'dinner' ? 'main' : (slots.find((s) => s.primary) || slots[0]).key;
   const rest = (field) =>
-    SLOTS.filter((s) => s.key !== slot).reduce((sum, { key }) => sum + (others[key] ? Number(others[key][field]) || 0 : mins[field][key]), 0);
+    slots.filter((s) => s.key !== slot).reduce((sum, { key }) => sum + (others[key] ? Number(others[key][field]) || 0 : mins[field][key] || 0), 0);
   if (isQuickDay(dateKey, c)) {
-    const max = c.quickScope === 'main' ? (slot === 'main' ? c.quickLimit : Infinity) : c.quickLimit - rest('time');
+    const max = c.quickScope === 'main' ? (slot === primary ? c.quickLimit : Infinity) : c.quickLimit - rest('time');
     if (max !== Infinity) {
       checks.push((r) => (Number(r.time) || 0) <= max);
       reasons.push('quick');
     }
   }
   if (c.healthy && c.kcalTarget) {
-    const max = c.kcalTarget - rest('kcal');
+    const max = mealKcalTarget(c, meal) - rest('kcal');
     checks.push((r) => !(Number(r.kcal) > 0) || Number(r.kcal) <= max);
     reasons.push('kcal');
   }
@@ -137,7 +147,15 @@ function companionWeight(mainRecipe, c) {
 
 const countBy = (items) => items.reduce((c, k) => (k ? ((c[k] = (c[k] || 0) + 1), c) : c), {});
 
-const poolFor = (recipes, slot) => recipes.filter((r) => r.category === SLOT_CATEGORY[slot]);
+// 夕ごはんの候補：種類が合い、夕ごはんに使えるレシピ
+const poolFor = (recipes, slot) => recipes.filter((r) => r.category === SLOT_CATEGORY[slot] && recipeMeals(r).includes('dinner'));
+
+/** 食事ごとのカロリー目標（朝は主食込みで8割） */
+export function mealKcalTarget(conditions, meal = 'dinner') {
+  const c = cond(conditions);
+  if (!c.kcalTarget) return null;
+  return Math.round(c.kcalTarget * (MEALS[meal]?.kcalFactor ?? 1));
+}
 
 /** その日・枠が固定されているか */
 export function isLocked(day, slot) {
@@ -390,24 +408,25 @@ export function setDayLock(plan, dayIndex, locked) {
   return { ...plan, days };
 }
 
-/** 料理ごとの固定を切り替える */
-export function setDishLock(plan, dayIndex, slot, locked) {
+/** 料理ごとの固定を切り替える（keys: その食事の枠。省略時は夕ごはん） */
+export function setDishLock(plan, dayIndex, slot, locked, keys = SLOTS.map((s) => s.key)) {
   const days = plan.days.map((d, i) => {
     if (i !== dayIndex) return d;
     // 日ごと固定されていた日の1品だけ解除するときは、残りの料理を料理ごとの固定に切り替える
-    const set = new Set(!locked && d.locked ? SLOTS.map((s) => s.key) : d.lockedSlots || []);
+    const set = new Set(!locked && d.locked ? keys : d.lockedSlots || []);
     locked ? set.add(slot) : set.delete(slot);
-    return { ...d, lockedSlots: SLOTS.map((s) => s.key).filter((k) => set.has(k)), locked: locked ? d.locked : false };
+    return { ...d, lockedSlots: keys.filter((k) => set.has(k)), locked: locked ? d.locked : false };
   });
   return { ...plan, days };
 }
 
-/** 2つの日の献立を入れ替える（日付はそのまま）。固定された日は入れ替えない */
-export function swapDays(plan, a, b) {
+/** 2つの日の献立を入れ替える（日付はそのまま）。固定された日・お弁当なしの日は入れ替えない */
+export function swapDays(plan, a, b, keys = SLOTS.map((s) => s.key)) {
   const dayA = plan.days[a];
   const dayB = plan.days[b];
-  if (SLOTS.some(({ key }) => isLocked(dayA, key) || isLocked(dayB, key))) return plan;
-  const menu = (d) => ({ main: d.main, side: d.side, soup: d.soup });
+  if (!dayA || !dayB || dayA.off || dayB.off) return plan;
+  if (keys.some((key) => isLocked(dayA, key) || isLocked(dayB, key))) return plan;
+  const menu = (d) => Object.fromEntries(keys.map((k) => [k, d[k] ?? null]));
   const days = plan.days.map((d, i) => {
     if (i === a) return { ...d, ...menu(dayB) };
     if (i === b) return { ...d, ...menu(dayA) };
@@ -429,4 +448,180 @@ export function repairPlan(plan, recipes, opts = {}) {
     });
   });
   return result;
+}
+
+// ======================================================================
+// 朝ごはん・昼ごはん・お弁当（汎用の献立づくり）
+//
+// mealPlan: { days: [{ date, <枠>: レシピID, locked, lockedSlots, off? }] }
+// opts: conditions / avoid / base / report / force（夕ごはんと同じ）と
+//   slots     : 使う枠（昼の小鉢オフなど。省略時はすべて）
+//   activeDay : (date) => boolean。false の日は off（お弁当を作らない曜日）
+//   dayUsed   : Map(date → Set(レシピID))。同じ日のほかの食事の料理（できるだけ重ねない）
+// ======================================================================
+
+// ジャンルの相性（その日すでに決まった料理のジャンルと同じ／違う）。朝は和食・洋食をそろえる
+const MEAL_HARMONY = {
+  breakfast: { same: 4, mismatch: 0.06 },
+  lunch: { same: 2, mismatch: 0.4 },
+  bento: { same: 1.5, mismatch: 0.7 },
+};
+
+function harmonyWeight(meal, anchor, r) {
+  if (!anchor || !r) return 1;
+  const h = MEAL_HARMONY[meal] || { same: 2, mismatch: 0.5 };
+  if (r.cuisine === anchor.cuisine) return h.same;
+  if (r.cuisine === 'その他' || anchor.cuisine === 'その他') return 1;
+  if (meal !== 'breakfast' && (r.cuisine === '和' || anchor.cuisine === '和')) return 1;
+  return h.mismatch;
+}
+
+function mealContext(recipes, meal, opts) {
+  const slots = opts.slots || MEALS[meal].slots;
+  const pools = Object.fromEntries(slots.map((s) => [s.key, mealPool(recipes, meal, s.key)]));
+  return {
+    meal,
+    slots,
+    allKeys: MEALS[meal].slots.map((s) => s.key),
+    pools,
+    mins: minimumsOf(pools),
+    byId: new Map(recipes.map((r) => [r.id, r])),
+    c: cond(opts.conditions),
+    avoid: opts.avoid instanceof Set ? opts.avoid : new Set(opts.avoid || []),
+    dayUsed: opts.dayUsed instanceof Map ? opts.dayUsed : new Map(),
+    report: opts.report || null,
+  };
+}
+
+/** 1日分（1食分）の空いている枠を埋める。exclude: { 枠: 選び直す前のID }（同じ料理に戻らないように） */
+function fillMealDay(day, used, ctx, exclude = {}) {
+  const { meal, slots, pools, byId, c, avoid, dayUsed, mins, report } = ctx;
+  for (const s of slots) {
+    if (day[s.key] || !pools[s.key].length) continue;
+    const chosen = Object.fromEntries(slots.map((x) => [x.key, byId.get(day[x.key]) || null]));
+    const anchor = slots.map((x) => chosen[x.key]).find(Boolean) || null;
+    const clash = new Set(slots.map((x) => chosen[x.key]?.main).filter((m) => PROTEINS.has(m)));
+    const otherMeal = dayUsed.get(day.date) || new Set();
+    const sameDay = new Set(slots.map((x) => day[x.key]).filter(Boolean));
+    const notCurrent = (r) => r.id !== exclude[s.key] && !sameDay.has(r.id);
+    const fresh = (r) => !used.has(r.id);
+    const ok = (r) => !avoid.has(r.id) && !otherMeal.has(r.id);
+    const noClash = (r) => !clash.has(r.main);
+    const picked = pickWithFallback(
+      pools[s.key],
+      [
+        (r) => notCurrent(r) && fresh(r) && ok(r) && noClash(r),
+        (r) => notCurrent(r) && fresh(r) && !otherMeal.has(r.id) && noClash(r),
+        (r) => notCurrent(r) && fresh(r) && noClash(r),
+        (r) => notCurrent(r) && fresh(r),
+        (r) => notCurrent(r) && !otherMeal.has(r.id) && noClash(r),
+        (r) => notCurrent(r) && noClash(r),
+        notCurrent,
+      ],
+      (r) => favWeight(r) * preferenceWeight(r, c, !!s.primary) * harmonyWeight(meal, anchor, r),
+      hardCondition(c, day.date, s.key, chosen, mins, slots, meal),
+      report,
+    );
+    if (picked) {
+      day[s.key] = picked.id;
+      used.add(picked.id);
+    }
+  }
+  return day;
+}
+
+/**
+ * 条件（時短・カロリー目標）は3品の組み合わせで決まるので、1品ずつ選ぶと最後の枠で合うものがなくなることがある。
+ * そのときは同じ日を何度か選び直し、条件をゆるめずに済む組み合わせを探す。
+ */
+function fillMealDayRetry(day, used, ctx, exclude = {}, tries = 30) {
+  let last = null;
+  for (let t = 0; t < tries; t++) {
+    const local = [];
+    const usedCopy = new Set(used);
+    const result = fillMealDay({ ...day }, usedCopy, { ...ctx, report: local }, exclude);
+    last = { result, usedCopy, local };
+    if (!local.length) break;
+  }
+  last.usedCopy.forEach((id) => used.add(id));
+  if (ctx.report) last.local.forEach((k) => ctx.report.includes(k) || ctx.report.push(k));
+  return last.result;
+}
+
+const idsInMeal = (days, keys, skipIndex = -1) =>
+  new Set(days.flatMap((d, i) => (i === skipIndex || d.off ? [] : keys.map((k) => d[k]))).filter(Boolean));
+
+/** 朝ごはん・昼ごはん・お弁当の1週間分を作る（base の固定はそのまま） */
+export function generateMealWeek(recipes, startKey, meal, opts = {}) {
+  const ctx = mealContext(recipes, meal, opts);
+  const activeDay = opts.activeDay || (() => true);
+  const baseDays = new Map((opts.base?.days || []).map((d) => [d.date, d]));
+  const days = Array.from({ length: PLAN_DAYS }, (_, i) => {
+    const date = addDays(startKey, i);
+    const old = baseDays.get(date);
+    const day = { date, locked: false, lockedSlots: [], off: false };
+    ctx.allKeys.forEach((k) => (day[k] = null));
+    if (!activeDay(date)) return { ...day, off: true };
+    if (old && !old.off) {
+      day.locked = old.locked === true;
+      day.lockedSlots = [...(old.lockedSlots || [])];
+      ctx.allKeys.forEach((k) => {
+        if (isLocked(old, k) && ctx.byId.has(old[k])) day[k] = old[k];
+      });
+    }
+    return day;
+  });
+  const used = idsInMeal(days, ctx.allKeys);
+  const filled = days.map((day) => (day.off ? day : fillMealDayRetry(day, used, ctx)));
+  return { days: filled };
+}
+
+/** 朝ごはん・昼ごはん・お弁当の1品を選び直す（固定・お弁当なしの日はそのまま） */
+export function rerollMealDish(mealPlan, dayIndex, slot, recipes, meal, opts = {}) {
+  const day = mealPlan.days[dayIndex];
+  if (!day || day.off) return mealPlan;
+  if (!opts.force && isLocked(day, slot)) {
+    opts.report?.includes('locked') || opts.report?.push('locked');
+    return mealPlan;
+  }
+  const ctx = mealContext(recipes, meal, { ...opts, slots: (opts.slots || MEALS[meal].slots).filter((s) => s.key === slot || day[s.key]) });
+  const used = idsInMeal(mealPlan.days, ctx.allKeys, dayIndex);
+  const next = fillMealDayRetry({ ...day, [slot]: null }, used, ctx, { [slot]: day[slot] });
+  if (!next[slot]) next[slot] = day[slot];
+  return { ...mealPlan, days: mealPlan.days.map((d, i) => (i === dayIndex ? next : d)) };
+}
+
+/** 朝ごはん・昼ごはん・お弁当の1日分をまるごと選び直す（固定した料理はそのまま） */
+export function rerollMealDay(mealPlan, dayIndex, recipes, meal, opts = {}) {
+  const day = mealPlan.days[dayIndex];
+  if (!day || day.off) return mealPlan;
+  const ctx = mealContext(recipes, meal, opts);
+  const cleared = { ...day };
+  const exclude = {};
+  ctx.slots.forEach(({ key }) => {
+    if (!isLocked(day, key)) {
+      exclude[key] = day[key];
+      cleared[key] = null;
+    }
+  });
+  const used = idsInMeal(mealPlan.days, ctx.allKeys, dayIndex);
+  const next = fillMealDayRetry(cleared, used, ctx, exclude);
+  return { ...mealPlan, days: mealPlan.days.map((d, i) => (i === dayIndex ? next : d)) };
+}
+
+/** 存在しないIDの枠を埋め直す（削除した自作レシピなど。固定されていても埋め直す） */
+export function repairMealPlan(mealPlan, recipes, meal, opts = {}) {
+  const ids = new Set(recipes.map((r) => r.id));
+  const ctx = mealContext(recipes, meal, opts);
+  let changed = false;
+  const days = mealPlan.days.map((day, i) => {
+    if (day.off) return day;
+    const missing = ctx.slots.filter(({ key }) => (!day[key] || !ids.has(day[key])) && ctx.pools[key].length);
+    if (!missing.length) return day;
+    changed = true;
+    const cleared = { ...day };
+    missing.forEach(({ key }) => (cleared[key] = null));
+    return fillMealDayRetry(cleared, idsInMeal(mealPlan.days, ctx.allKeys, i), ctx);
+  });
+  return changed ? { ...mealPlan, days } : mealPlan;
 }

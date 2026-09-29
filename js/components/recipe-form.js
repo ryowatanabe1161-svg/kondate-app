@@ -4,6 +4,7 @@ import * as store from '../store.js';
 import { CATEGORIES, CUISINES, MAIN_INGREDIENTS } from '../data/recipes.js';
 import { esc, uid } from '../lib/util.js';
 import { closeSheet, icon, openSheet, toast } from '../lib/ui.js';
+import { MEALS, MEAL_KEYS, recipeMeals } from '../meals.js';
 
 function ingredientRow(ing = { name: '', amount: '' }) {
   return `
@@ -32,6 +33,7 @@ export function openRecipeForm(recipe, onSaved) {
     tips: [],
     ...recipe,
   };
+  const fits = recipeMeals(r);
   const rows = (r.ingredients.length ? r.ingredients : [{}, {}, {}]).map(ingredientRow).join('');
 
   openSheet({
@@ -45,9 +47,17 @@ export function openRecipeForm(recipe, onSaved) {
 
         <fieldset class="field">
           <legend class="field-label">種類</legend>
-          <div class="segmented">
+          <div class="segmented cat-seg">
             ${CATEGORIES.map((c) => `
               <label><input type="radio" name="category" value="${c}" ${c === r.category ? 'checked' : ''}><span>${c}</span></label>`).join('')}
+          </div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend class="field-label">使う食事 <small>（献立に出す食事）</small></legend>
+          <div class="meal-checks">
+            ${MEAL_KEYS.map((m) => `
+              <label class="meal-check"><input type="checkbox" name="meals" value="${m}" ${fits.includes(m) ? 'checked' : ''}><span>${MEALS[m].emoji}${MEALS[m].short}</span></label>`).join('')}
           </div>
         </fieldset>
 
@@ -130,6 +140,7 @@ export function openRecipeForm(recipe, onSaved) {
           id: r.id || uid('u'),
           name,
           category: data.get('category'),
+          meals: data.getAll('meals').length ? data.getAll('meals') : undefined,
           main: data.get('main'),
           cuisine: data.get('cuisine'),
           kcal: Number(data.get('kcal')) || null,

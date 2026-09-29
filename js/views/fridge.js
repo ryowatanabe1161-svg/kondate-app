@@ -2,14 +2,15 @@
 
 import * as store from '../store.js';
 import * as actions from '../actions.js';
-import { SLOTS } from '../planner.js';
+import { recipeMeals } from '../meals.js';
 import { allIngredientNames, commonIngredientGroups, rankRecipes } from '../fridge.js';
 import { esc } from '../lib/util.js';
 import { categoryBadge, categoryClass, icon, toast, stars } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
+import { foodArt } from '../lib/art.js';
 
 const PAGE_SIZE = 20;
-const FILTERS = ['すべて', '主菜', '副菜', '汁物'];
+const CATEGORY_FILTERS = ['主菜', '副菜', '汁物'];
 
 // 画面を切り替えても表示状態を覚えておく
 const viewState = { tab: null, filter: 'すべて', limit: PAGE_SIZE };
@@ -36,14 +37,26 @@ function pickerHtml(groups, selected) {
     .join('');
 }
 
+/** 「今日の◯◯にする」ボタン（入れられる食事が複数あるときは食事ごとに出す） */
+export function setTodayButtons(recipe, attr = 'data-set-today', cls = 'btn btn-primary btn-sm') {
+  const targets = actions.todayTargets(recipe);
+  const multi = actions.enabledMeals().length > 1;
+  return targets
+    .map((t) => {
+      const def = actions.mealDef(t.meal);
+      const text = multi ? (targets.length > 1 ? `${def.short}の${t.label}に` : `今日の${def.short}の${t.label}にする`) : `今日の${t.label}にする`;
+      return `<button class="${cls}" ${attr}="${esc(recipe.id)}" data-slot="${t.slot}" data-meal="${t.meal}">${esc(text)}</button>`;
+    })
+    .join('');
+}
+
 function resultCard({ recipe, matched, missing }, todayIds) {
-  const slot = SLOTS.find((s) => s.category === recipe.category);
   const total = matched.length + missing.length;
   const inToday = todayIds.includes(recipe.id);
   return `
     <li class="fridge-result ${categoryClass(recipe.category)}">
       <button class="fridge-result-main" data-open="${esc(recipe.id)}">
-        <span class="emoji-circle">${esc(recipe.emoji)}</span>
+        ${foodArt(recipe, { size: 'sm', className: 'emoji-circle' })}
         <span class="fridge-result-body">
           <span class="recipe-name">${esc(recipe.name)}</span>
           <span class="recipe-meta">${categoryBadge(recipe.category)}<span>${esc(recipe.cuisine)}</span><span class="meta-time">${icon('clock', { size: 14 })}${esc(recipe.time)}分</span>${stars(recipe.rating)}</span>
@@ -60,7 +73,7 @@ function resultCard({ recipe, matched, missing }, todayIds) {
         <button class="btn btn-outline btn-sm" data-open="${esc(recipe.id)}">レシピを見る</button>
         ${inToday
           ? `<span class="in-today">${icon('check', { size: 16 })}今日の献立です</span>`
-          : `<button class="btn btn-primary btn-sm" data-set-today="${esc(recipe.id)}" data-slot="${slot.key}">今日の${esc(recipe.category)}にする</button>`}
+          : setTodayButtons(recipe)}
       </div>
     </li>`;
 }
@@ -69,11 +82,21 @@ export function renderFridge(container, { rerender }) {
   const recipes = store.allRecipes();
   const fridge = store.getFridge();
   const selected = new Set(fridge);
-  const results = rankRecipes(recipes, fridge);
-  const filtered = results.filter((r) => viewState.filter === 'すべて' || r.recipe.category === viewState.filter);
+  const meals = actions.enabledMeals();
+  const multi = meals.length > 1;
+  // 献立を作る食事に合うレシピだけを提案する（夕ごはんだけなら従来どおり）
+  const usable = recipes.filter((r) => recipeMeals(r).some((m) => meals.includes(m)));
+  const results = rankRecipes(usable, fridge);
+  const filters = [
+    { key: 'すべて', label: 'すべて', test: () => true },
+    ...(multi ? meals.map((m) => ({ key: `meal:${m}`, label: `${actions.mealDef(m).emoji}${actions.mealDef(m).short}`, test: (r) => recipeMeals(r).includes(m) })) : []),
+    ...CATEGORY_FILTERS.map((c) => ({ key: c, label: c, test: (r) => r.category === c })),
+  ];
+  if (!filters.some((f) => f.key === viewState.filter)) viewState.filter = 'すべて';
+  const activeFilter = filters.find((f) => f.key === viewState.filter);
+  const filtered = results.filter((r) => activeFilter.test(r.recipe));
   const tab = viewState.tab || (fridge.length ? 'results' : 'pick');
-  const todayPlan = actions.resolvedDays()[actions.todayIndex()];
-  const todayIds = SLOTS.map((s) => todayPlan[s.key]?.id).filter(Boolean);
+  const todayIds = actions.todayMeals().flatMap((m) => (m.day && !m.day.off ? m.slots.map((s) => m.day[s.key]?.id) : [])).filter(Boolean);
 
   container.innerHTML = `
     <section class="card fridge-head">
@@ -103,7 +126,7 @@ export function renderFridge(container, { rerender }) {
          </div>`
       : `<div class="fridge-results">
            <div class="chips">
-             ${FILTERS.map((f) => `<button class="chip ${f === viewState.filter ? 'active' : ''}" data-filter="${f}">${f}</button>`).join('')}
+             ${filters.map((f) => `<button class="chip ${f.key === viewState.filter ? 'active' : ''}" data-filter="${esc(f.key)}">${esc(f.label)}</button>`).join('')}
            </div>
            ${!fridge.length
              ? '<p class="empty-state">「食材を選ぶ」から冷蔵庫にある食材を選んでください。</p>'
@@ -169,8 +192,10 @@ export function renderFridge(container, { rerender }) {
     const setToday = e.target.closest('[data-set-today]');
     if (setToday) {
       const recipe = store.getRecipe(setToday.dataset.setToday);
-      actions.setDish(actions.todayIndex(), setToday.dataset.slot, recipe.id);
-      toast(`今日の${recipe.category}を「${recipe.name}」にしました`);
+      const meal = setToday.dataset.meal || 'dinner';
+      actions.setDish(actions.todayIndex(), setToday.dataset.slot, recipe.id, 'this', meal);
+      const label = actions.slotsOf(meal).find((x) => x.key === setToday.dataset.slot)?.label || recipe.category;
+      toast(`今日の${multi ? `${actions.mealDef(meal).short}の` : ''}${label}を「${recipe.name}」にしました`);
       rerender();
       return;
     }

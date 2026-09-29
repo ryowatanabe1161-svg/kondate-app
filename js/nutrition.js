@@ -25,8 +25,10 @@ const BASE_PROFILE = {
   '汁物:肉': [0.28, 0.4, 0.32],
   '汁物:魚': [0.34, 0.3, 0.36],
   '汁物:卵・豆腐': [0.32, 0.4, 0.28],
+  '主食:ご飯・パン': [0.12, 0.24, 0.64],
+  '主菜:ご飯・パン': [0.18, 0.4, 0.42], // サンドイッチなど
 };
-const DEFAULT_PROFILE = { 主菜: [0.26, 0.46, 0.28], 副菜: [0.12, 0.42, 0.46], 汁物: [0.24, 0.34, 0.42] };
+const DEFAULT_PROFILE = { 主菜: [0.26, 0.46, 0.28], 副菜: [0.12, 0.42, 0.46], 汁物: [0.24, 0.34, 0.42], 主食: [0.12, 0.24, 0.64], '飲み物・デザート': [0.14, 0.3, 0.56] };
 
 const FRIED = /揚げ|フライ|唐揚げ|天ぷら|カツ|竜田|春巻|コロッケ/;
 const LEAN = /ささみ|むね|たら|えび|いか|たこ|かじき|まぐろ|かつお（|豆腐|おから/;
@@ -42,7 +44,7 @@ export function estimatePFC(recipe) {
   if (FRIED.test(recipe.name) || /揚げ油/.test(names)) [p, f, c] = [p - 0.06, f + 0.12, c - 0.06];
   if (LEAN.test(names)) [p, f, c] = [p + 0.08, f - 0.1, c + 0.02];
   if (FATTY.test(names)) [p, f, c] = [p - 0.03, f + 0.07, c - 0.04];
-  if (STARCHY.test(names) && recipe.main !== '麺・丼') [p, f, c] = [p - 0.07, f - 0.08, c + 0.15];
+  if (STARCHY.test(names) && recipe.main !== '麺・丼' && recipe.category !== '主食') [p, f, c] = [p - 0.07, f - 0.08, c + 0.15];
   if ((recipe.tags || []).includes('ヘルシー')) [p, f, c] = [p + 0.03, f - 0.05, c + 0.02];
   [p, f, c] = [p, f, c].map((x) => Math.max(0.05, x));
   const sum = p + f + c;
@@ -106,7 +108,7 @@ export function mealNutrition(recipes) {
     if (names.some(isProteinSource) || ['肉', '魚', '卵・豆腐'].includes(r.main)) proteinDishes++;
     if (names.some(isCarbSource)) carbDishes++;
   }
-  const staple = list.some((r) => r.main === '麺・丼');
+  const staple = list.some((r) => r.main === '麺・丼' || r.main === 'ご飯・パン' || r.category === '主食');
   return {
     kcal,
     unknown,
@@ -115,7 +117,7 @@ export function mealNutrition(recipes) {
     vegNames: [...veg],
     proteinDishes,
     carbDishes,
-    staple, // 主食（麺・丼）が含まれるか。含まれない場合はご飯を添える前提
+    staple, // 主食（麺・丼・ご飯・パン）が含まれるか。含まれない場合はご飯を添える前提
     protein: pfc.p >= 20 && proteinDishes ? 'good' : proteinDishes ? 'ok' : 'low',
     vegetable: veg.size >= 5 ? 'good' : veg.size >= 3 ? 'ok' : 'low',
   };

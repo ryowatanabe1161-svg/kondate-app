@@ -1,9 +1,10 @@
 // localStorage への保存・読み込みと、レシピ／献立データへのアクセス
 
 import { BUILTIN_RECIPES, normalizeRecipe } from './data/recipes.js';
+import { ALL_SLOT_KEYS, DEFAULT_MEAL_SETTINGS, MEAL_KEYS, sanitizeMealSettings } from './meals.js';
 
 const STORAGE_KEY = 'kondate.v1'; // キー名は初期版から据え置き（中身の version で移行を管理）
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 
 export const RATING_MAX = 5;
 
@@ -23,7 +24,7 @@ export const DEFAULT_CONDITIONS = () => ({
   relaxWeekend: true, // 休日（土日）は時短にしない
   budget: false, // 節約モード
   healthy: false, // ヘルシーモード
-  kcalTarget: null, // ヘルシーモードの1日（夕食1食）のカロリー目標（1人分）。null は目標なし
+  kcalTarget: null, // ヘルシーモードの1食のカロリー目標（1人分。朝ごはんは8割）。null は目標なし
   cuisinePref: 'none', // ジャンルの好み（'none' | '和' | '洋' | '中'）
 });
 
@@ -45,18 +46,32 @@ export function sanitizeConditions(value) {
   return c;
 }
 
-const SLOT_KEYS = ['main', 'side', 'soup'];
+/** 1日分（1食分）の固定フラグをそろえる */
+function sanitizeDay(d, keys) {
+  const day = d && typeof d === 'object' ? d : {};
+  const out = {
+    ...day,
+    locked: day.locked === true,
+    lockedSlots: Array.isArray(day.lockedSlots) ? keys.filter((k) => day.lockedSlots.includes(k)) : [],
+  };
+  if ('off' in day) out.off = day.off === true;
+  return out;
+}
 
-/** 献立データを安全な形にそろえる（固定フラグを含む）。壊れていれば null */
+/** 献立データを安全な形にそろえる（固定フラグ・朝/昼/お弁当を含む）。壊れていれば null */
 function sanitizePlan(plan) {
   if (!plan || typeof plan !== 'object' || !Array.isArray(plan.days) || typeof plan.start !== 'string') return null;
+  const meals = {};
+  const src = plan.meals && typeof plan.meals === 'object' && !Array.isArray(plan.meals) ? plan.meals : {};
+  for (const m of MEAL_KEYS) {
+    if (m === 'dinner' || !src[m] || !Array.isArray(src[m].days) || src[m].days.length !== plan.days.length) continue;
+    const days = src[m].days.map((d, i) => sanitizeDay({ ...d, date: plan.days[i].date }, ALL_SLOT_KEYS[m]));
+    meals[m] = { days };
+  }
   return {
     ...plan,
-    days: plan.days.map((d) => ({
-      ...d,
-      locked: d.locked === true,
-      lockedSlots: Array.isArray(d.lockedSlots) ? SLOT_KEYS.filter((k) => d.lockedSlots.includes(k)) : [],
-    })),
+    days: plan.days.map((d) => sanitizeDay(d, ALL_SLOT_KEYS.dinner)),
+    meals,
   };
 }
 
@@ -73,11 +88,12 @@ const DEFAULT_STATE = () => ({
   version: CURRENT_VERSION,
   customRecipes: [], // ユーザーが追加したレシピ
   favorites: [], // お気に入りのレシピID
-  plan: null, // 今週 { id, start: 'YYYY-MM-DD', days: [{ date, main, side, soup, locked, lockedSlots }] }
+  plan: null, // 今週 { id, start: 'YYYY-MM-DD', days: [夕ごはん { date, main, side, soup, locked, lockedSlots }], meals: { breakfast|bento|lunch: { days: [...] } } }
   nextPlan: null, // 来週（今週の最終日の翌日から7日分。作ったときだけ）
   shopping: emptyShopping(), // 今週の買い物リストのチェック状態
   shoppingNext: emptyShopping(), // 来週の買い物リスト
   conditions: DEFAULT_CONDITIONS(), // 献立の条件
+  mealSettings: DEFAULT_MEAL_SETTINGS(), // どの食事の献立を作るか（初期は夕ごはんだけ）
   servings: BASE_SERVINGS, // 何人分で作るか（1〜4人）
   fridge: [], // 冷蔵庫にある食材（提案機能で選んだもの）
   ratings: {}, // レシピの星評価 { レシピID: 1〜5 }（未評価は含めない）
@@ -101,6 +117,7 @@ function load() {
  * v1（初期版）→ v2: 冷蔵庫の食材リストを追加。自作レシピのジャンル等は読み込み時に補完する。
  * v2 → v3: レシピの星評価（ratings）を追加。壊れた値は捨てる。
  * v3 → v4: 献立の条件・来週の献立・来週の買い物リスト・日／料理の固定フラグを追加。
+ * v4 → v5: 食事の設定（朝ごはん・昼ごはん・お弁当。初期はすべてオフ＝夕ごはんだけ）と plan.meals を追加。
  */
 function migrate(saved) {
   const base = DEFAULT_STATE();
@@ -112,6 +129,7 @@ function migrate(saved) {
   s.shopping = sanitizeShopping(s.shopping);
   s.shoppingNext = sanitizeShopping(s.shoppingNext);
   s.conditions = sanitizeConditions(s.conditions);
+  s.mealSettings = sanitizeMealSettings(s.mealSettings);
   s.plan = sanitizePlan(s.plan);
   s.nextPlan = sanitizePlan(s.nextPlan);
   if (s.version !== CURRENT_VERSION) {
@@ -256,6 +274,18 @@ export function setConditions(conditions) {
   state.conditions = sanitizeConditions({ ...state.conditions, ...conditions });
   save();
   return getConditions();
+}
+
+// ---- 食事の設定 ----
+
+export function getMealSettings() {
+  return sanitizeMealSettings(state.mealSettings);
+}
+
+export function setMealSettings(patch) {
+  state.mealSettings = sanitizeMealSettings({ ...state.mealSettings, ...patch });
+  save();
+  return getMealSettings();
 }
 
 // ---- 人数設定 ----

@@ -2,12 +2,21 @@
 
 import * as store from '../store.js';
 import * as actions from '../actions.js';
-import { SLOTS } from '../planner.js';
 import { esc } from '../lib/util.js';
 import { categoryBadge, closeSheet, icon, openSheet, starInput, toast } from '../lib/ui.js';
 import { pfcOf } from '../nutrition.js';
 import { openRecipeForm } from './recipe-form.js';
 import { scaleAmount } from '../shopping.js';
+import { recipeHeroArt } from '../lib/art.js';
+import { MEALS, recipeMeals } from '../meals.js';
+
+let reopen = null; // 評価・お気に入りで開き直すとき { pop: 星の数 }
+
+function todayButton(t, withMeal, small) {
+  const def = MEALS[t.meal];
+  const text = small ? `${def.emoji}${def.short}の${t.label}に` : `今日の${withMeal ? `${def.short}の` : ''}${t.label}にする`;
+  return `<button class="btn ${small ? 'btn-outline btn-sm' : 'btn-primary'}" data-act="today" data-meal="${t.meal}" data-slot="${t.slot}">${esc(text)}</button>`;
+}
 
 /**
  * @param {string} recipeId
@@ -16,7 +25,8 @@ import { scaleAmount } from '../shopping.js';
 export function openRecipeDetail(recipeId, onChange) {
   const recipe = store.getRecipe(recipeId);
   if (!recipe) return;
-  const slot = SLOTS.find((s) => s.category === recipe.category)?.key;
+  const targets = actions.todayTargets(recipe);
+  const multiMeals = actions.enabledMeals().length > 1;
 
   const servings = store.getServings();
   const factor = store.servingFactor();
@@ -65,14 +75,15 @@ export function openRecipeDetail(recipeId, onChange) {
   openSheet({
     title: recipe.name,
     body: `
+      ${recipeHeroArt(recipe)}
       <div class="detail-hero">
-        <span class="detail-emoji" aria-hidden="true">${esc(recipe.emoji)}</span>
         <div class="detail-meta">
           ${categoryBadge(recipe.category)}
           <span class="chip-static">${esc(recipe.cuisine)}</span>
           <span class="chip-static">${esc(recipe.main)}</span>
           <span class="meta-time">${icon('clock', { size: 16 })}約${esc(recipe.time)}分</span>
           ${recipe.builtin ? '' : '<span class="chip-static mine">自分のレシピ</span>'}
+          <span class="meal-fit" aria-label="向いている食事">${recipeMeals(recipe).map((m) => `<span class="meal-fit-chip">${MEALS[m].emoji}${esc(MEALS[m].short)}</span>`).join('')}</span>
         </div>
       </div>
       ${nutrition}
@@ -87,18 +98,32 @@ export function openRecipeDetail(recipeId, onChange) {
           <button class="btn btn-outline fav-toggle ${recipe.fav ? 'on' : ''}" data-act="fav">
             ${icon('star', { filled: recipe.fav, size: 18 })}${recipe.fav ? 'お気に入り済み' : 'お気に入り'}
           </button>
-          ${slot ? `<button class="btn btn-primary" data-act="today">今日の${esc(recipe.category)}にする</button>` : ''}
+          ${targets.length === 1 ? todayButton(targets[0], multiMeals, false) : ''}
         </div>
+        ${targets.length > 1 ? `<div class="today-targets"><p class="today-targets-label">今日の献立に入れる</p>${targets.map((t) => todayButton(t, true, true)).join('')}</div>` : ''}
         ${ownerActions}
       </div>`,
     onMount(sheet) {
+      if (reopen) {
+        // 開き直したときはシートのスライドを出さず、押した星をぽんと弾ませる
+        sheet.classList.add('no-enter');
+        sheet.previousElementSibling?.classList.add('no-enter');
+        if (reopen.pop) sheet.querySelectorAll('.star-btn.on').forEach((b, i) => { b.classList.add('pop'); b.style.setProperty('--i', i); });
+        if (reopen.fav) sheet.querySelector('.fav-toggle')?.classList.add('pop');
+        if (reopen.scroll) sheet.querySelector('.sheet-body').scrollTop = reopen.scroll;
+        reopen = null;
+      }
+      const again = (extra = {}) => {
+        reopen = { scroll: sheet.querySelector('.sheet-body').scrollTop, ...extra };
+        openRecipeDetail(recipe.id, onChange);
+      };
       sheet.addEventListener('click', (e) => {
         const rate = e.target.closest('[data-rate]');
         if (rate) {
           const n = store.setRating(recipe.id, Number(rate.dataset.rate));
           toast(`「${recipe.name}」を星${n}つにしました`);
           onChange();
-          openRecipeDetail(recipe.id, onChange);
+          again({ pop: n });
           return;
         }
         const act = e.target.closest('[data-act]')?.dataset.act;
@@ -107,17 +132,20 @@ export function openRecipeDetail(recipeId, onChange) {
           store.setRating(recipe.id, 0);
           toast('評価を消しました');
           onChange();
-          openRecipeDetail(recipe.id, onChange);
+          again();
           return;
         }
         if (act === 'fav') {
           const on = store.toggleFavorite(recipe.id);
           toast(on ? 'お気に入りに追加しました' : 'お気に入りから外しました');
           onChange();
-          openRecipeDetail(recipe.id, onChange);
+          again({ fav: on });
         } else if (act === 'today') {
-          actions.setDish(actions.todayIndex(), slot, recipe.id);
-          toast(`今日の${recipe.category}を「${recipe.name}」にしました`);
+          const btn = e.target.closest('[data-act]');
+          const meal = btn.dataset.meal || 'dinner';
+          const t = targets.find((x) => x.meal === meal) || targets[0];
+          actions.setDish(actions.todayIndex(), t.slot, recipe.id, 'this', t.meal);
+          toast(`今日の${multiMeals ? `${MEALS[t.meal].short}の` : ''}${t.label}を「${recipe.name}」にしました`);
           closeSheet();
           onChange();
         } else if (act === 'edit') {

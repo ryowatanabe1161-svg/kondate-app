@@ -1,7 +1,7 @@
 // 画面2：1週間の献立（今週／来週・日と料理の固定・献立の条件）
 
 import * as actions from '../actions.js';
-import { SLOTS, isLocked } from '../planner.js';
+import { isLocked } from '../planner.js';
 import { addDays, esc, formatDateShort, todayKey, weekdayIndex } from '../lib/util.js';
 import { categoryClass, icon, toast } from '../lib/ui.js';
 import { openRecipePicker } from '../components/recipe-picker.js';
@@ -12,14 +12,22 @@ import { conditionChips } from '../components/settings-sheet.js';
 
 let swapSource = null; // 「入替」で最初に選んだ日のインデックス
 let viewWeek = 'this'; // 表示中の週（'this' | 'next'）
+let viewMeal = 'dinner'; // 表示中の食事
+let tabAnim = ''; // タブを切り替えたときのアニメーション（'left' | 'right'）
 
-const SHORT = { main: '主', side: '副', soup: '汁' };
+const MEAL_TAB_ORDER = ['breakfast', 'bento', 'lunch', 'dinner'];
 const WEEK_LABEL = { this: '今週', next: '来週' };
 const BALANCE_ORDER = ['肉', '魚', '卵・豆腐', '麺・丼', '野菜', '海藻・きのこ', 'その他'];
 
 /** 他の画面から表示する週を切り替える（買い物リストの「来週の献立を作る」など） */
 export function showWeek(week) {
   viewWeek = week === 'next' ? 'next' : 'this';
+  swapSource = null;
+}
+
+/** 表示する食事を切り替える */
+export function showMeal(meal) {
+  viewMeal = meal;
   swapSource = null;
 }
 
@@ -31,16 +39,28 @@ function balanceSummary(days) {
     .join('');
 }
 
-function dayCard(day, i, isToday) {
+function dayCard(day, i, isToday, meal, slots) {
   const wd = weekdayIndex(day.date);
   const wdClass = wd === 0 ? 'sun' : wd === 6 ? 'sat' : '';
-  const anyLock = SLOTS.some(({ key }) => isLocked(day, key));
+  if (day.off) {
+    return `
+      <article class="day-card is-off" data-day="${i}" style="--i:${i}">
+        <header class="day-header">
+          <div class="day-title">
+            <span class="day-date ${wdClass}">${formatDateShort(day.date)}</span>
+            ${isToday ? '<span class="today-pill">今日</span>' : ''}
+          </div>
+          <span class="off-note">🍱 お弁当なし</span>
+        </header>
+      </article>`;
+  }
+  const anyLock = slots.some(({ key }) => isLocked(day, key));
   const classes = ['day-card', isToday && 'is-today', day.locked && 'is-locked', swapSource === i && 'swap-source', swapSource !== null && swapSource !== i && 'swap-target']
     .filter(Boolean)
     .join(' ');
 
   return `
-    <article class="${classes}" data-day="${i}">
+    <article class="${classes}" data-day="${i}" style="--i:${i}">
       <header class="day-header">
         <div class="day-title">
           <span class="day-date ${wdClass}">${formatDateShort(day.date)}</span>
@@ -53,17 +73,17 @@ function dayCard(day, i, isToday) {
         </div>
       </header>
       <ul class="day-dishes">
-        ${SLOTS.map(({ key, category }) => `
+        ${slots.map(({ key, short, label, categories }) => `
           <li>
-            <button class="day-dish ${isLocked(day, key) ? 'locked' : ''}" data-pick="${i}:${key}">
-              <span class="dot ${categoryClass(category)}">${SHORT[key]}</span>
+            <button class="day-dish ${isLocked(day, key) ? 'locked' : ''}" data-pick="${i}:${key}" data-meal="${meal}" aria-label="${esc(label)}：${esc(day[key]?.name || '未設定')}">
+              <span class="dot ${categoryClass(day[key]?.category || categories[0])}">${esc(short)}</span>
               <span class="day-dish-name">${day[key] ? `<span class="inline-emoji" aria-hidden="true">${esc(day[key].emoji)}</span>` : ''}${esc(day[key]?.name || '（未設定）')}</span>
               ${isLocked(day, key) ? `<span class="dish-lock" aria-label="固定中">${icon('lock', { size: 14 })}</span>` : `<span class="day-dish-meta">${esc(day[key]?.main || '')}</span>`}
               ${icon('chevron', { size: 16 })}
             </button>
           </li>`).join('')}
       </ul>
-      ${dayNutritionLine(mealNutrition(SLOTS.map(({ key }) => day[key])))}
+      ${dayNutritionLine(mealNutrition(slots.map(({ key }) => day[key])))}
     </article>`;
 }
 
@@ -74,6 +94,17 @@ function weekTabs(thisDays) {
     <div class="segmented week-tabs" role="tablist" aria-label="表示する週">
       <label><input type="radio" name="week" value="this" ${viewWeek === 'this' ? 'checked' : ''}><span>今週<small>${range(thisDays[0].date)}</small></span></label>
       <label><input type="radio" name="week" value="next" ${viewWeek === 'next' ? 'checked' : ''}><span>来週<small>${range(nextStart)}</small></span></label>
+    </div>`;
+}
+
+function mealTabs(meals) {
+  if (meals.length < 2) return '';
+  return `
+    <div class="segmented meal-tabs" role="tablist" aria-label="表示する食事" style="grid-template-columns: repeat(${meals.length}, 1fr)">
+      ${meals.map((m) => {
+        const def = actions.mealDef(m);
+        return `<label><input type="radio" name="meal" value="${m}" ${viewMeal === m ? 'checked' : ''}><span><i aria-hidden="true">${def.emoji}</i>${esc(def.short)}</span></label>`;
+      }).join('')}
     </div>`;
 }
 
@@ -89,13 +120,24 @@ export function renderWeek(container, { rerender, headerAction }) {
   const thisDays = actions.resolvedDays('this');
   const hasNext = !!actions.getNextPlan();
   if (viewWeek === 'next' && swapSource !== null && !hasNext) swapSource = null;
+  const meals = MEAL_TAB_ORDER.filter((m) => actions.enabledMeals().includes(m));
+  if (!meals.includes(viewMeal)) viewMeal = 'dinner';
   const week = viewWeek;
-  const days = week === 'next' ? actions.resolvedDays('next') : thisDays;
+  const meal = viewMeal;
+  const def = actions.mealDef(meal);
+  const multi = meals.length > 1;
+  const slots = actions.slotsOf(meal);
+  const days = week === 'next' ? (hasNext ? actions.resolvedMealDays('next', meal) : []) : actions.resolvedMealDays('this', meal);
+  const activeDays = days.filter((d) => !d.off);
+  const anim = tabAnim;
+  tabAnim = '';
   const todayIdx = week === 'this' ? actions.todayIndex() : -1;
   const today = todayKey();
 
   const regenerate = () => {
-    const locked = days.some((d) => SLOTS.some(({ key }) => isLocked(d, key)));
+    const locked = multi
+      ? meals.some((m) => actions.resolvedMealDays(week, m).some((d) => actions.slotsOf(m).some(({ key }) => isLocked(d, key))))
+      : days.some((d) => slots.some(({ key }) => isLocked(d, key)));
     const msg = actions.relaxMessage(actions.regenerateWeek(week));
     swapSource = null;
     toast(msg || `${WEEK_LABEL[week]}の献立を作り直しました${locked ? '（固定はそのまま）' : ''}`);
@@ -104,7 +146,8 @@ export function renderWeek(container, { rerender, headerAction }) {
 
   headerAction.innerHTML = days.length ? `<button class="header-btn" data-regenerate>${icon('reroll', { size: 18 })}作り直す</button>` : '';
   headerAction.querySelector('[data-regenerate]')?.addEventListener('click', () => {
-    if (!confirm(`${WEEK_LABEL[week]}の献立を作り直しますか？\n（固定した日・料理はそのまま。買い物リストのチェックはリセットされます）`)) return;
+    const what = multi ? `（${meals.map((m) => actions.mealDef(m).label).join('・')}）` : '';
+    if (!confirm(`${WEEK_LABEL[week]}の献立${what}を作り直しますか？\n（固定した日・料理はそのまま。買い物リストのチェックはリセットされます）`)) return;
     regenerate();
   });
 
@@ -123,27 +166,46 @@ export function renderWeek(container, { rerender, headerAction }) {
         <button class="btn btn-primary btn-block btn-lg" data-create-next>${icon('plus', { size: 20 })}来週の献立を作る</button>
       </section>`;
   } else {
+    const allAvg = multi
+      ? Math.round(actions.allMealsDays(week).reduce((s, d) => s + d.recipes.reduce((t, r) => t + (Number(r.kcal) || 0), 0), 0) / days.length)
+      : null;
     container.innerHTML = `
       ${weekTabs(thisDays)}
-      <section class="card week-summary">
-        <p class="week-range">${formatDateShort(days[0].date)} 〜 ${formatDateShort(days[days.length - 1].date)}</p>
+      ${mealTabs(meals)}
+      <section class="card week-summary ${anim ? `tab-enter-${anim}` : ''}">
+        <p class="week-range">${multi ? `<span class="week-meal">${def.emoji}${esc(def.label)}</span>` : ''}${formatDateShort(days[0].date)} 〜 ${formatDateShort(days[days.length - 1].date)}</p>
         ${conditionsBar()}
-        <div class="balance"><span class="balance-label">主菜のバランス</span>${balanceSummary(days)}</div>
-        ${weekNutritionSummary(weekNutrition(days.map((d) => SLOTS.map(({ key }) => d[key]))))}
+        ${meal === 'dinner' ? `<div class="balance"><span class="balance-label">主菜のバランス</span>${balanceSummary(days)}</div>` : ''}
+        ${activeDays.length
+          ? weekNutritionSummary(weekNutrition(activeDays.map((d) => slots.map(({ key }) => d[key]))), {
+              title: multi ? `${def.label}の目安` : 'カロリー・栄養の目安',
+              note: meal === 'dinner' || meal === 'bento' ? '1人分・ご飯別' : '1人分',
+              pills: meal === 'dinner',
+              allAvg,
+            })
+          : '<p class="hint">この週はお弁当の日がありません（設定で曜日を選べます）</p>'}
         <p class="hint">料理をタップすると好きなレシピに変更・固定できます。${icon('lock', { size: 13 })}固定した日は「作り直す」や条件の変更でも変わりません</p>
       </section>
       ${swapSource !== null ? `
         <div class="swap-banner" role="status">
           <span>「${formatDateShort(days[swapSource].date)}」と入れ替える日の<b>「ここと」</b>を押してください</span>
         </div>` : ''}
-      <div class="day-list">
-        ${days.map((d, i) => dayCard(d, i, week === 'this' && (d.date === today || i === todayIdx))).join('')}
+      <div class="day-list ${anim ? `tab-enter-${anim}` : ''}">
+        ${days.map((d, i) => dayCard(d, i, week === 'this' && (d.date === today || i === todayIdx), meal, slots)).join('')}
       </div>`;
   }
 
   container.addEventListener('change', (e) => {
+    const mealTab = e.target.closest('input[name=meal]');
+    if (mealTab) {
+      tabAnim = meals.indexOf(mealTab.value) > meals.indexOf(viewMeal) ? 'left' : 'right';
+      showMeal(mealTab.value);
+      rerender();
+      return;
+    }
     const tab = e.target.closest('input[name=week]');
     if (!tab) return;
+    tabAnim = tab.value === 'next' ? 'left' : 'right';
     showWeek(tab.value);
     rerender();
   });
@@ -163,7 +225,7 @@ export function renderWeek(container, { rerender, headerAction }) {
     const lock = e.target.closest('[data-lock-day]');
     if (lock) {
       const i = Number(lock.dataset.lockDay);
-      const on = actions.toggleDayLock(i, week);
+      const on = actions.toggleDayLock(i, week, meal);
       if (on && swapSource !== null) swapSource = null;
       toast(on ? `${formatDateShort(days[i].date)}を固定しました（作り直しても変わりません）` : `${formatDateShort(days[i].date)}の固定を解除しました`);
       rerender();
@@ -180,7 +242,7 @@ export function renderWeek(container, { rerender, headerAction }) {
       if (swapSource === null) swapSource = i;
       else if (swapSource === i) swapSource = null;
       else {
-        if (actions.swapDays(swapSource, i, week)) {
+        if (actions.swapDays(swapSource, i, week, meal)) {
           toast(`${formatDateShort(days[swapSource].date)}と${formatDateShort(days[i].date)}を入れ替えました`);
         }
         swapSource = null;
@@ -196,7 +258,7 @@ export function renderWeek(container, { rerender, headerAction }) {
         toast('固定中の日です（「固定中」を押すと解除できます）');
         return;
       }
-      const msg = actions.relaxMessage(actions.rerollDay(i, week));
+      const msg = actions.relaxMessage(actions.rerollDay(i, week, meal));
       toast(msg || `${formatDateShort(days[i].date)}の献立を選び直しました`);
       rerender();
       return;
@@ -206,25 +268,28 @@ export function renderWeek(container, { rerender, headerAction }) {
     if (pick) {
       const [i, slot] = pick.dataset.pick.split(':');
       const dayIndex = Number(i);
-      const category = SLOTS.find((s) => s.key === slot).category;
+      const slotDef = slots.find((s) => s.key === slot);
+      const category = slotDef.label;
       const day = days[dayIndex];
       openRecipePicker({
-        title: `${formatDateShort(day.date)}の${category}`,
+        title: `${formatDateShort(day.date)}の${multi ? `${def.short}・` : ''}${category}`,
         category,
+        meal,
+        slot,
         currentId: day[slot]?.id ?? null,
         locked: isLocked(day, slot),
         dayLocked: day.locked,
         onPick: (id) => {
-          actions.setDish(dayIndex, slot, id, week);
+          actions.setDish(dayIndex, slot, id, week, meal);
           rerender();
         },
         onRandom: () => {
-          const msg = actions.relaxMessage(actions.rerollDish(dayIndex, slot, week));
+          const msg = actions.relaxMessage(actions.rerollDish(dayIndex, slot, week, meal));
           if (msg) toast(msg);
           rerender();
         },
         onToggleLock: () => {
-          const on = actions.toggleDishLock(dayIndex, slot, week);
+          const on = actions.toggleDishLock(dayIndex, slot, week, meal);
           toast(on ? `${category}を固定しました` : `${category}の固定を解除しました`);
           rerender();
           return on;

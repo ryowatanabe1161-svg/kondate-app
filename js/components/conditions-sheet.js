@@ -48,7 +48,7 @@ function formHtml(c) {
     <section class="cond-section">
       ${toggle('healthy', 'ヘルシーモード', c.healthy, '「ヘルシー」タグや低カロリーの料理を優先し、揚げ物を控えめに')}
       <div class="cond-sub" ${c.healthy ? '' : 'hidden'}>
-        <p class="cond-label">1日（夕食1食・1人分）のカロリー目標 <small>ご飯別</small></p>
+        <p class="cond-label">1食（1人分）のカロリー目標 <small>夕・お弁当はご飯別／朝は主食込みで8割</small></p>
         ${segmented('kcalTarget', [['', 'なし'], ...store.KCAL_TARGETS.map((n) => [n, `${n}`])], c.kcalTarget ?? '', 'small')}
       </div>
     </section>

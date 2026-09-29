@@ -5,12 +5,20 @@ import { esc } from '../lib/util.js';
 import { categoryBadge, categoryClass, icon, stars, toast } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
 import { openRecipeForm } from '../components/recipe-form.js';
+import { foodArt } from '../lib/art.js';
+import { recipeMeals } from '../meals.js';
 
 const FILTERS = [
   { key: 'all', label: 'すべて', test: () => true },
   { key: '主菜', label: '主菜', test: (r) => r.category === '主菜' },
   { key: '副菜', label: '副菜', test: (r) => r.category === '副菜' },
   { key: '汁物', label: '汁物', test: (r) => r.category === '汁物' },
+  { key: '主食', label: '主食', test: (r) => r.category === '主食' },
+  { key: '飲み物・デザート', label: '飲み物', test: (r) => r.category === '飲み物・デザート' },
+  { key: 'meal:breakfast', label: '🌅朝ごはん', test: (r) => recipeMeals(r).includes('breakfast') },
+  { key: 'meal:lunch', label: '☀️昼ごはん', test: (r) => recipeMeals(r).includes('lunch') },
+  { key: 'meal:bento', label: '🍱お弁当', test: (r) => recipeMeals(r).includes('bento') },
+  { key: 'meal:dinner', label: '🌙夕ごはん', test: (r) => recipeMeals(r).includes('dinner') },
   { key: 'fav', label: 'お気に入り', test: (r) => r.fav },
   { key: 'mine', label: '自分のレシピ', test: (r) => !r.builtin },
 ];
@@ -47,7 +55,7 @@ function matches(recipe, query) {
 function recipeRow(r) {
   return `
     <li class="recipe-row ${categoryClass(r.category)}">
-      <span class="emoji-circle" aria-hidden="true">${esc(r.emoji)}</span>
+      ${foodArt(r, { size: 'sm', className: 'emoji-circle' })}
       <button class="recipe-open" data-open="${esc(r.id)}">
         <span class="recipe-name">${esc(r.name)}${r.builtin ? '' : '<span class="mine-dot">自作</span>'}</span>
         <span class="recipe-meta">
