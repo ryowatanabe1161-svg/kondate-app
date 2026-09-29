@@ -3,7 +3,9 @@
 import { BUILTIN_RECIPES, normalizeRecipe } from './data/recipes.js';
 
 const STORAGE_KEY = 'kondate.v1'; // キー名は初期版から据え置き（中身の version で移行を管理）
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
+
+export const RATING_MAX = 5;
 
 /** 組み込みレシピ・自作レシピの分量は常に「2人分」で保存する */
 export const BASE_SERVINGS = 2;
@@ -17,6 +19,7 @@ const DEFAULT_STATE = () => ({
   shopping: { planId: null, checked: [], extras: [] }, // 買い物リストのチェック状態
   servings: BASE_SERVINGS, // 何人分で作るか（1〜4人）
   fridge: [], // 冷蔵庫にある食材（提案機能で選んだもの）
+  ratings: {}, // レシピの星評価 { レシピID: 1〜5 }（未評価は含めない）
 });
 
 let state = load();
@@ -35,6 +38,7 @@ function load() {
 /**
  * 古い保存データを現在の形式にそろえる。
  * v1（初期版）→ v2: 冷蔵庫の食材リストを追加。自作レシピのジャンル等は読み込み時に補完する。
+ * v2 → v3: レシピの星評価（ratings）を追加。壊れた値は捨てる。
  */
 function migrate(saved) {
   const base = DEFAULT_STATE();
@@ -42,6 +46,7 @@ function migrate(saved) {
   s.customRecipes = Array.isArray(s.customRecipes) ? s.customRecipes : [];
   s.favorites = Array.isArray(s.favorites) ? s.favorites : [];
   s.fridge = Array.isArray(s.fridge) ? s.fridge : [];
+  s.ratings = sanitizeRatings(s.ratings);
   s.shopping = { ...base.shopping, ...(s.shopping || {}) };
   if (!Array.isArray(s.shopping.checked)) s.shopping.checked = [];
   if (!Array.isArray(s.shopping.extras)) s.shopping.extras = [];
@@ -56,6 +61,16 @@ function migrate(saved) {
   return s;
 }
 
+function sanitizeRatings(value) {
+  const out = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [id, n] of Object.entries(value)) {
+    const v = Number(n);
+    if (id && Number.isInteger(v) && v >= 1 && v <= RATING_MAX) out[id] = v;
+  }
+  return out;
+}
+
 function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -66,10 +81,14 @@ function save() {
 
 // ---- レシピ ----
 
-/** 組み込み＋自作レシピ（fav フラグ付き）を返す */
+/** 組み込み＋自作レシピ（fav フラグ・rating 付き。rating は未評価なら 0）を返す */
 export function allRecipes() {
   const favs = new Set(state.favorites);
-  return [...BUILTIN_RECIPES, ...state.customRecipes.map(normalizeRecipe)].map((r) => ({ ...r, fav: favs.has(r.id) }));
+  return [...BUILTIN_RECIPES, ...state.customRecipes.map(normalizeRecipe)].map((r) => ({
+    ...r,
+    fav: favs.has(r.id),
+    rating: state.ratings[r.id] || 0,
+  }));
 }
 
 export function getRecipe(id) {
@@ -91,6 +110,8 @@ export function toggleFavorite(id) {
 export function saveCustomRecipe(recipe) {
   const clean = { ...recipe, builtin: false };
   delete clean.fav;
+  delete clean.rating; // 評価は ratings に別で保存する
+  delete clean.pfc; // 自作レシピの栄養はカロリーから推定する
   const i = state.customRecipes.findIndex((r) => r.id === clean.id);
   if (i >= 0) state.customRecipes[i] = clean;
   else state.customRecipes.push(clean);
@@ -100,7 +121,23 @@ export function saveCustomRecipe(recipe) {
 export function deleteCustomRecipe(id) {
   state.customRecipes = state.customRecipes.filter((r) => r.id !== id);
   state.favorites = state.favorites.filter((f) => f !== id);
+  delete state.ratings[id];
   save();
+}
+
+// ---- 星評価 ----
+
+export function getRating(id) {
+  return state.ratings[id] || 0;
+}
+
+/** 1〜5 で評価を付ける。0 を渡すと評価を消す */
+export function setRating(id, n) {
+  const v = Number(n);
+  if (Number.isInteger(v) && v >= 1 && v <= RATING_MAX) state.ratings[id] = v;
+  else delete state.ratings[id];
+  save();
+  return getRating(id);
 }
 
 // ---- 献立 ----

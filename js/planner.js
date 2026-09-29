@@ -19,8 +19,11 @@ const PROTEINS = new Set(['肉', '魚', '卵・豆腐']);
 export const NOODLE_MAX_PER_WEEK = 1;
 const NOODLE = '麺・丼';
 
-// お気に入りは3倍選ばれやすくする
-const favWeight = (r) => (r.fav ? 3 : 1);
+// 星評価による出やすさ：★5はかなり多め、★4は多め、★2は少なめ、★1はほぼ出ない（未評価・★3は標準）
+export const RATING_WEIGHT = { 0: 1, 1: 0.02, 2: 0.35, 3: 1, 4: 2, 5: 4 };
+
+// お気に入りは3倍選ばれやすくする × 星評価の重み
+const favWeight = (r) => (r.fav ? 3 : 1) * (RATING_WEIGHT[r.rating || 0] ?? 1);
 
 // ジャンルの基本の出やすさ（家庭の献立らしく和食を多めに）
 const CUISINE_WEIGHT = { 和: 3, 洋: 2, 中: 2, その他: 1.2 };

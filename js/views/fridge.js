@@ -5,7 +5,7 @@ import * as actions from '../actions.js';
 import { SLOTS } from '../planner.js';
 import { allIngredientNames, commonIngredientGroups, rankRecipes } from '../fridge.js';
 import { esc } from '../lib/util.js';
-import { categoryBadge, categoryClass, icon, toast } from '../lib/ui.js';
+import { categoryBadge, categoryClass, icon, toast, stars } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
 
 const PAGE_SIZE = 20;
@@ -46,7 +46,7 @@ function resultCard({ recipe, matched, missing }, todayIds) {
         <span class="emoji-circle">${esc(recipe.emoji)}</span>
         <span class="fridge-result-body">
           <span class="recipe-name">${esc(recipe.name)}</span>
-          <span class="recipe-meta">${categoryBadge(recipe.category)}<span>${esc(recipe.cuisine)}</span><span class="meta-time">${icon('clock', { size: 14 })}${esc(recipe.time)}分</span></span>
+          <span class="recipe-meta">${categoryBadge(recipe.category)}<span>${esc(recipe.cuisine)}</span><span class="meta-time">${icon('clock', { size: 14 })}${esc(recipe.time)}分</span>${stars(recipe.rating)}</span>
         </span>
         <span class="match-score" aria-label="${total}品中${matched.length}品そろっています"><b>${matched.length}</b>/${total}</span>
       </button>

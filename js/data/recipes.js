@@ -9,6 +9,8 @@
 //  - カロリーはご飯を含まない目安（丼・麺類は主食込み）
 // ※ b01〜b48 は初期バージョンからのID。保存済みの献立・お気に入りが参照するので変えないこと。
 
+import { NUTRIENTS } from './nutrients.js';
+
 export const CATEGORIES = ['主菜', '副菜', '汁物'];
 export const MAIN_INGREDIENTS = ['肉', '魚', '卵・豆腐', '麺・丼', '野菜', '海藻・きのこ', 'その他'];
 export const CUISINES = ['和', '洋', '中', 'その他'];
@@ -56,7 +58,7 @@ const R = (id, name, category, main, cuisine, time, kcal, emoji, tags, ingredien
   builtin: true,
 });
 
-export const BUILTIN_RECIPES = [
+const RAW_RECIPES = [
   // ═════════════ 主菜：肉 ═════════════
   R('b01', '肉じゃが', '主菜', '肉', '和', 30, 400, '🥔', '定番 作り置き',
     '牛こま切れ肉 150g、じゃがいも 3個、玉ねぎ 1個、にんじん 1本、しらたき 1袋、だし汁 300ml、醤油 大さじ3、砂糖 大さじ2、みりん 大さじ2、酒 大さじ2',
@@ -468,3 +470,9 @@ export const BUILTIN_RECIPES = [
     '玉ねぎ 1/2個、卵 1個、だし汁 400ml、味噌 大さじ2',
     ['玉ねぎを薄切りにしてだし汁で煮る。', '味噌を溶き入れ、溶き卵を回し入れてふんわり固める。']),
 ];
+
+/** 組み込みレシピ（栄養の目安 pfc: {p, f, c} g/1人分 を付けたもの） */
+export const BUILTIN_RECIPES = RAW_RECIPES.map((r) => {
+  const n = NUTRIENTS[r.id];
+  return n ? { ...r, pfc: { p: n[0], f: n[1], c: n[2] } } : r;
+});

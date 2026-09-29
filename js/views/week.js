@@ -5,11 +5,13 @@ import { SLOTS } from '../planner.js';
 import { esc, formatDateShort, todayKey, weekdayIndex } from '../lib/util.js';
 import { categoryClass, icon, toast } from '../lib/ui.js';
 import { openRecipePicker } from '../components/recipe-picker.js';
+import { mealNutrition, weekNutrition } from '../nutrition.js';
+import { dayNutritionLine, weekNutritionSummary } from '../components/nutrition-view.js';
 
 let swapSource = null; // 「入替」で最初に選んだ日のインデックス
 
 const SHORT = { main: '主', side: '副', soup: '汁' };
-const BALANCE_ORDER = ['肉', '魚', '卵・豆腐', '野菜', '海藻・きのこ', 'その他'];
+const BALANCE_ORDER = ['肉', '魚', '卵・豆腐', '麺・丼', '野菜', '海藻・きのこ', 'その他'];
 
 function balanceSummary(days) {
   const counts = {};
@@ -49,6 +51,7 @@ function dayCard(day, i, isToday) {
             </button>
           </li>`).join('')}
       </ul>
+      ${dayNutritionLine(mealNutrition(SLOTS.map(({ key }) => day[key])))}
     </article>`;
 }
 
@@ -70,6 +73,7 @@ export function renderWeek(container, { rerender, headerAction }) {
     <section class="card week-summary">
       <p class="week-range">${formatDateShort(days[0].date)} 〜 ${formatDateShort(days[days.length - 1].date)}</p>
       <div class="balance"><span class="balance-label">主菜のバランス</span>${balanceSummary(days)}</div>
+      ${weekNutritionSummary(weekNutrition(days.map((d) => SLOTS.map(({ key }) => d[key]))))}
       <p class="hint">料理をタップすると好きなレシピに変更できます</p>
     </section>
     ${swapSource !== null ? `

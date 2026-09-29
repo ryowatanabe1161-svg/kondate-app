@@ -3,10 +3,12 @@
 import * as actions from '../actions.js';
 import { SLOTS } from '../planner.js';
 import { esc, formatDateLong, todayKey } from '../lib/util.js';
-import { categoryClass, icon, toast } from '../lib/ui.js';
+import { categoryClass, icon, stars, toast } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
 import { openSettingsSheet } from '../components/settings-sheet.js';
 import { getServings } from '../store.js';
+import { mealNutrition } from '../nutrition.js';
+import { mealNutritionCard } from '../components/nutrition-view.js';
 
 let flashSlots = []; // 直前に入れ替えた枠（アニメーション用）
 
@@ -28,7 +30,9 @@ function dishCard(slot, category, recipe) {
         <p class="dish-meta">
           <span>${esc(recipe.main)}</span>
           <span class="meta-time">${icon('clock', { size: 14 })}${esc(recipe.time)}分</span>
+          ${recipe.kcal ? `<span class="meta-kcal" data-kcal="${esc(recipe.kcal)}">約${esc(recipe.kcal)}kcal</span>` : ''}
           ${recipe.fav ? `<span class="fav-mark">${icon('star', { filled: true, size: 14 })}</span>` : ''}
+          ${stars(recipe.rating)}
         </p>
       </div>
       <button class="reroll-btn" data-reroll="${slot}" aria-label="${category}を入れ替える">${icon('reroll')}</button>
@@ -45,6 +49,7 @@ export function renderToday(container, { rerender, headerAction }) {
   const tomorrow = days[index + 1];
   const dishes = SLOTS.map(({ key }) => today[key]).filter(Boolean);
   const totalTime = dishes.reduce((s, r) => s + Number(r.time || 0), 0);
+  const meal = mealNutrition(dishes);
 
   container.innerHTML = `
     <section class="today-hero">
@@ -58,7 +63,7 @@ export function renderToday(container, { rerender, headerAction }) {
       ${SLOTS.map(({ key, category }) => dishCard(key, category, today[key])).join('')}
     </div>
 
-    <p class="today-total">${icon('clock', { size: 16 })}調理時間の目安 合計 約${totalTime}分</p>
+    <p class="today-total">${icon('clock', { size: 16 })}調理時間の目安 合計 約${totalTime}分<span class="sep">／</span>約${meal.kcal}kcal<small>（1人分・目安）</small></p>
 
     <button class="btn btn-primary btn-block btn-lg" data-reroll-all>
       ${icon('reroll')}まるごと入れ替える
@@ -69,6 +74,8 @@ export function renderToday(container, { rerender, headerAction }) {
       <span class="fridge-cta-text"><b>冷蔵庫のあまりもので探す</b><small>ある食材を選ぶと、作れる料理を提案します</small></span>
       ${icon('chevron', { size: 18 })}
     </a>
+
+    ${mealNutritionCard(meal)}
 
     ${tomorrow ? `
       <section class="card tomorrow">

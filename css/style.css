@@ -518,3 +518,80 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- 星評価 ---------- */
+.stars { display: inline-flex; align-items: center; gap: 1px; color: #e3d6c4; vertical-align: middle; }
+.stars .star.on { color: #f0a830; }
+.stars .icon { display: block; }
+.picker-name .stars { flex-shrink: 0; margin-left: 2px; }
+.rating-box {
+  margin: 12px 0 4px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: #fff8ea; border: 1.5px solid #f6e2b8;
+}
+.rating-head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
+.rating-title { font-size: 13px; font-weight: 800; color: #9a6a12; }
+.link-btn.small { font-size: 12px; color: var(--text-sub); font-weight: 600; text-decoration: underline; }
+.star-input { display: flex; gap: 4px; margin: 6px 0 2px; }
+.star-btn {
+  width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: #dccbb2; border-radius: 12px; cursor: pointer;
+}
+.star-btn.on { color: #f0a830; }
+.star-btn:active { background: #fdecc8; transform: scale(0.94); }
+.rating-text { font-size: 12px; color: var(--text-sub); margin: 0; }
+
+/* レシピ一覧の絞り込み・並び順 */
+.list-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 2px; }
+.list-tools .select { min-height: 42px; padding: 6px 30px 6px 12px; font-size: 16px; font-weight: 700; width: 100%; }
+
+/* ---------- カロリー・栄養の目安 ---------- */
+.meta-kcal { font-weight: 700; }
+.today-total .sep { color: var(--line); margin: 0 2px; }
+.today-total small { font-size: 11px; }
+.nutri-card { margin-top: 14px; }
+.nutri-kcal { margin: 4px 0 6px; font-size: 14px; color: var(--text-sub); display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; }
+.nutri-kcal b { font-size: 28px; color: var(--text); font-weight: 800; }
+.nutri-rice { font-size: 12px; }
+.nutri-pfc { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 10px; font-size: 13px; color: var(--text-sub); }
+.nutri-pfc b { color: var(--text); font-size: 15px; }
+.nutri-pfc.small { font-size: 12px; gap: 2px 6px; margin-bottom: 8px; }
+.nutri-pfc.small b { font-size: 13px; }
+.nutri-note { font-size: 11px; color: var(--text-sub); margin: 8px 0 0; line-height: 1.5; }
+.bal-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bal-pill {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 7px 4px; border-radius: 12px; font-size: 12px; font-weight: 800; line-height: 1.3;
+  background: var(--surface-2); color: var(--text);
+}
+.bal-pill small { font-size: 11px; font-weight: 600; color: var(--text-sub); }
+.bal-mark { font-size: 16px; line-height: 1.1; }
+.bal-pill.good { background: var(--cat-side-soft); }
+.bal-pill.good .bal-mark { color: #3d7e2c; }
+.bal-pill.ok { background: #fbf1dc; }
+.bal-pill.ok .bal-mark { color: #b8862f; }
+.bal-pill.low { background: #fbe4df; }
+.bal-pill.low .bal-mark { color: var(--danger); }
+
+.day-nutri {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--text-sub);
+}
+.day-kcal { margin-right: auto; }
+.day-kcal b { color: var(--text); font-size: 14px; }
+.mini-bal { padding: 2px 8px; border-radius: 999px; font-weight: 700; background: var(--surface-2); }
+.mini-bal.good { background: var(--cat-side-soft); color: #3d6e2c; }
+.mini-bal.ok { background: #fbf1dc; color: #8a6420; }
+.mini-bal.low { background: #fbe4df; color: var(--danger); }
+
+.week-nutri { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.week-nutri-title { font-size: 13px; font-weight: 800; margin: 0 0 4px; }
+.week-nutri-title small { font-weight: 500; color: var(--text-sub); }
+.week-kcal { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--text-sub); margin-bottom: 2px; }
+.week-kcal b { color: var(--text); font-size: 18px; font-weight: 800; }
+
+.detail-nutri {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px;
+  margin: 10px 0 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: 13px; color: var(--text-sub);
+}
+.detail-nutri b { color: var(--text); }
+.detail-nutri-label { font-size: 11px; font-weight: 800; color: var(--primary-dark); }

@@ -2,7 +2,7 @@
 
 import * as store from '../store.js';
 import { esc } from '../lib/util.js';
-import { closeSheet, icon, openSheet } from '../lib/ui.js';
+import { closeSheet, icon, openSheet, stars } from '../lib/ui.js';
 
 /**
  * @param {object} opts
@@ -16,14 +16,14 @@ export function openRecipePicker({ title, category, currentId, onPick, onRandom 
   const recipes = store
     .allRecipes()
     .filter((r) => r.category === category)
-    .sort((a, b) => Number(b.fav) - Number(a.fav));
+    .sort((a, b) => Number(b.fav) - Number(a.fav) || b.rating - a.rating); // お気に入り → 評価の高い順
 
   const items = recipes
     .map((r) => `
       <li>
         <button class="picker-item ${r.id === currentId ? 'current' : ''}" data-pick="${esc(r.id)}" data-name="${esc(r.name)}">
-          <span class="picker-name"><span class="inline-emoji" aria-hidden="true">${esc(r.emoji)}</span>${r.fav ? `<span class="fav-mark">${icon('star', { filled: true, size: 14 })}</span>` : ''}${esc(r.name)}</span>
-          <span class="picker-meta">${esc(r.cuisine)}・${esc(r.main)}・${esc(r.time)}分</span>
+          <span class="picker-name"><span class="inline-emoji" aria-hidden="true">${esc(r.emoji)}</span>${r.fav ? `<span class="fav-mark">${icon('star', { filled: true, size: 14 })}</span>` : ''}${esc(r.name)}${stars(r.rating, { size: 12 })}</span>
+          <span class="picker-meta">${esc(r.cuisine)}・${esc(r.main)}・${esc(r.time)}分${r.kcal ? `・${esc(r.kcal)}kcal` : ''}</span>
           ${r.id === currentId ? `<span class="picker-check">${icon('check', { size: 18 })}</span>` : ''}
         </button>
       </li>`)

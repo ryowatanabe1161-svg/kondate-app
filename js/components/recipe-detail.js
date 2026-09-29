@@ -4,7 +4,8 @@ import * as store from '../store.js';
 import * as actions from '../actions.js';
 import { SLOTS } from '../planner.js';
 import { esc } from '../lib/util.js';
-import { categoryBadge, closeSheet, icon, openSheet, toast } from '../lib/ui.js';
+import { categoryBadge, closeSheet, icon, openSheet, starInput, toast } from '../lib/ui.js';
+import { pfcOf } from '../nutrition.js';
 import { openRecipeForm } from './recipe-form.js';
 import { scaleAmount } from '../shopping.js';
 
@@ -37,6 +38,23 @@ export function openRecipeDetail(recipeId, onChange) {
          <button class="btn btn-danger-outline" data-act="delete">${icon('trash', { size: 18 })}削除</button>
        </div>`;
 
+  const pfc = pfcOf(recipe);
+  const nutrition = recipe.kcal
+    ? `<p class="detail-nutri" aria-label="栄養の目安">
+         <span class="detail-nutri-label">目安/1人分</span>
+         <span>約<b>${esc(recipe.kcal)}</b>kcal</span>
+         ${pfc ? `<span>たんぱく質 <b>${pfc.p}</b>g</span><span>脂質 <b>${pfc.f}</b>g</span><span>炭水化物 <b>${pfc.c}</b>g</span>` : ''}
+       </p>`
+    : '<p class="detail-nutri muted">カロリーが未登録のため、栄養の目安は表示できません</p>';
+  const RATING_TEXT = ['まだ評価していません', 'いまいち（献立にほぼ出なくなります）', 'ふつう以下（出にくくなります）', 'ふつう', 'おいしい（出やすくなります）', 'とてもおいしい（よく出ます）'];
+  const rating = `
+    <div class="rating-box">
+      <div class="rating-head"><span class="rating-title">わが家の評価</span>
+        ${recipe.rating ? '<button class="link-btn small" data-act="unrate">評価を消す</button>' : ''}</div>
+      ${starInput(recipe.rating)}
+      <p class="rating-text">${RATING_TEXT[recipe.rating || 0]}</p>
+    </div>`;
+
   openSheet({
     title: recipe.name,
     body: `
@@ -47,10 +65,11 @@ export function openRecipeDetail(recipeId, onChange) {
           <span class="chip-static">${esc(recipe.cuisine)}</span>
           <span class="chip-static">${esc(recipe.main)}</span>
           <span class="meta-time">${icon('clock', { size: 16 })}約${esc(recipe.time)}分</span>
-          ${recipe.kcal ? `<span class="meta-kcal">約${esc(recipe.kcal)}kcal<small>/1人分</small></span>` : ''}
           ${recipe.builtin ? '' : '<span class="chip-static mine">自分のレシピ</span>'}
         </div>
       </div>
+      ${nutrition}
+      ${rating}
       ${recipe.tags.length ? `<div class="tag-row">${recipe.tags.map((t) => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
       <h3 class="section-title">材料 <small>（${servings}人分${servings === store.BASE_SERVINGS ? '' : '・2人分から換算'}）</small></h3>
       ${ingredients}
@@ -66,8 +85,23 @@ export function openRecipeDetail(recipeId, onChange) {
       </div>`,
     onMount(sheet) {
       sheet.addEventListener('click', (e) => {
+        const rate = e.target.closest('[data-rate]');
+        if (rate) {
+          const n = store.setRating(recipe.id, Number(rate.dataset.rate));
+          toast(`「${recipe.name}」を星${n}つにしました`);
+          onChange();
+          openRecipeDetail(recipe.id, onChange);
+          return;
+        }
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (!act) return;
+        if (act === 'unrate') {
+          store.setRating(recipe.id, 0);
+          toast('評価を消しました');
+          onChange();
+          openRecipeDetail(recipe.id, onChange);
+          return;
+        }
         if (act === 'fav') {
           const on = store.toggleFavorite(recipe.id);
           toast(on ? 'お気に入りに追加しました' : 'お気に入りから外しました');
@@ -81,7 +115,7 @@ export function openRecipeDetail(recipeId, onChange) {
         } else if (act === 'edit') {
           openRecipeForm(recipe, onChange);
         } else if (act === 'copy') {
-          const { id, fav, builtin, ...rest } = recipe;
+          const { id, fav, builtin, rating, pfc, ...rest } = recipe;
           openRecipeForm({ ...rest, name: `${recipe.name}（アレンジ）` }, onChange);
         } else if (act === 'delete') {
           if (!confirm(`「${recipe.name}」を削除しますか？`)) return;

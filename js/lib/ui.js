@@ -26,6 +26,24 @@ export function icon(name, { filled = false, size = 22 } = {}) {
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 }
 
+// ---- 星評価 ----
+
+/** 読み取り専用の星（未評価なら空文字） */
+export function stars(rating, { size = 13, showEmpty = false } = {}) {
+  const n = Number(rating) || 0;
+  if (!n && !showEmpty) return '';
+  const items = [1, 2, 3, 4, 5].map((i) => `<span class="star ${i <= n ? 'on' : ''}">${icon('star', { filled: i <= n, size })}</span>`).join('');
+  return `<span class="stars" role="img" aria-label="${n ? `星${n}つ` : '未評価'}" data-rating="${n}">${items}</span>`;
+}
+
+/** タップで評価できる星（data-rate="1〜5"） */
+export function starInput(rating, { size = 30 } = {}) {
+  const n = Number(rating) || 0;
+  return `<div class="star-input" role="radiogroup" aria-label="星評価">${[1, 2, 3, 4, 5]
+    .map((i) => `<button type="button" class="star-btn ${i <= n ? 'on' : ''}" data-rate="${i}" role="radio" aria-checked="${i === n}" aria-label="星${i}つ">${icon('star', { filled: i <= n, size })}</button>`)
+    .join('')}</div>`;
+}
+
 // ---- カテゴリ表示 ----
 const CATEGORY_CLASS = { 主菜: 'cat-main', 副菜: 'cat-side', 汁物: 'cat-soup' };
 

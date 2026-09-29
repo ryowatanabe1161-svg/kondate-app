@@ -2,7 +2,7 @@
 
 import * as store from '../store.js';
 import { esc } from '../lib/util.js';
-import { categoryBadge, categoryClass, icon, toast } from '../lib/ui.js';
+import { categoryBadge, categoryClass, icon, stars, toast } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
 import { openRecipeForm } from '../components/recipe-form.js';
 
@@ -15,8 +15,23 @@ const FILTERS = [
   { key: 'mine', label: '自分のレシピ', test: (r) => !r.builtin },
 ];
 
+// 星評価での絞り込み・並び順
+const RATING_FILTERS = [
+  { key: 'any', label: '評価：すべて', test: () => true },
+  { key: '5', label: '★5だけ', test: (r) => r.rating === 5 },
+  { key: '4', label: '★4以上', test: (r) => r.rating >= 4 },
+  { key: '3', label: '★3以上', test: (r) => r.rating >= 3 },
+  { key: 'low', label: '★2以下', test: (r) => r.rating > 0 && r.rating <= 2 },
+  { key: 'none', label: '未評価', test: (r) => !r.rating },
+];
+const SORTS = [
+  { key: 'default', label: '標準の並び', compare: () => 0 },
+  { key: 'rating', label: '評価が高い順', compare: (a, b) => b.rating - a.rating },
+  { key: 'rating-asc', label: '評価が低い順', compare: (a, b) => (a.rating || 9) - (b.rating || 9) },
+];
+
 // 画面を切り替えても検索条件を覚えておく
-const filterState = { filter: 'all', query: '' };
+const filterState = { filter: 'all', query: '', rating: 'any', sort: 'default' };
 
 function matches(recipe, query) {
   if (!query) return true;
@@ -40,6 +55,7 @@ function recipeRow(r) {
           <span>${esc(r.cuisine)}・${esc(r.main)}</span>
           <span class="meta-time">${icon('clock', { size: 14 })}${esc(r.time)}分</span>
           ${r.kcal ? `<span>${esc(r.kcal)}kcal</span>` : ''}
+          ${stars(r.rating)}
         </span>
       </button>
       <button class="fav-btn ${r.fav ? 'on' : ''}" data-fav="${esc(r.id)}" aria-pressed="${r.fav}" aria-label="${esc(r.name)}をお気に入り${r.fav ? 'から外す' : 'に追加'}">
@@ -60,6 +76,18 @@ export function renderRecipes(container, { rerender }) {
           ${f.key === 'fav' ? icon('star', { filled: true, size: 14 }) : ''}${f.label}
         </button>`).join('')}
     </div>
+    <div class="list-tools">
+      <label class="select-wrap"><span class="visually-hidden">評価で絞り込み</span>
+        <select class="input select" data-rating-filter aria-label="評価で絞り込み">
+          ${RATING_FILTERS.map((f) => `<option value="${f.key}" ${f.key === filterState.rating ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select>
+      </label>
+      <label class="select-wrap"><span class="visually-hidden">並び順</span>
+        <select class="input select" data-sort aria-label="並び順">
+          ${SORTS.map((f) => `<option value="${f.key}" ${f.key === filterState.sort ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select>
+      </label>
+    </div>
     <p class="list-count"></p>
     <ul class="recipe-list"></ul>
     <p class="data-footer">
@@ -73,7 +101,14 @@ export function renderRecipes(container, { rerender }) {
 
   function renderList() {
     const filter = FILTERS.find((f) => f.key === filterState.filter);
-    const recipes = store.allRecipes().filter((r) => filter.test(r) && matches(r, filterState.query));
+    const ratingFilter = RATING_FILTERS.find((f) => f.key === filterState.rating) || RATING_FILTERS[0];
+    const sort = SORTS.find((f) => f.key === filterState.sort) || SORTS[0];
+    const recipes = store
+      .allRecipes()
+      .filter((r) => filter.test(r) && ratingFilter.test(r) && matches(r, filterState.query))
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => sort.compare(a.r, b.r) || a.i - b.i) // 同じ評価なら元の順
+      .map(({ r }) => r);
     countEl.textContent = `${recipes.length}件のレシピ`;
     listEl.innerHTML = recipes.length
       ? recipes.map(recipeRow).join('')
@@ -82,6 +117,15 @@ export function renderRecipes(container, { rerender }) {
           : '該当するレシピがありません'}</li>`;
   }
   renderList();
+
+  container.querySelector('[data-rating-filter]').addEventListener('change', (e) => {
+    filterState.rating = e.target.value;
+    renderList();
+  });
+  container.querySelector('[data-sort]').addEventListener('change', (e) => {
+    filterState.sort = e.target.value;
+    renderList();
+  });
 
   container.querySelector('.search-input').addEventListener('input', (e) => {
     filterState.query = e.target.value.trim();
@@ -117,10 +161,12 @@ export function renderRecipes(container, { rerender }) {
       return;
     }
     if (e.target.closest('[data-reset]')) {
-      if (!confirm('自作レシピ・お気に入り・献立・買い物リストをすべて削除して初期状態に戻しますか？')) return;
+      if (!confirm('自作レシピ・お気に入り・評価・献立・買い物リストをすべて削除して初期状態に戻しますか？')) return;
       store.resetAll();
       filterState.filter = 'all';
       filterState.query = '';
+      filterState.rating = 'any';
+      filterState.sort = 'default';
       toast('データを初期化しました');
       rerender();
     }
