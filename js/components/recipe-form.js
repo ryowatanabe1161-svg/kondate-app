@@ -1,7 +1,7 @@
 // レシピの追加・編集フォーム（ボトムシート）
 
 import * as store from '../store.js';
-import { CATEGORIES, MAIN_INGREDIENTS } from '../data/recipes.js';
+import { CATEGORIES, CUISINES, MAIN_INGREDIENTS } from '../data/recipes.js';
 import { esc, uid } from '../lib/util.js';
 import { closeSheet, icon, openSheet, toast } from '../lib/ui.js';
 
@@ -24,7 +24,9 @@ export function openRecipeForm(recipe, onSaved) {
     name: '',
     category: '主菜',
     main: '肉',
+    cuisine: '和',
     time: 20,
+    kcal: '',
     ingredients: [],
     steps: [],
     ...recipe,
@@ -55,9 +57,22 @@ export function openRecipeForm(recipe, onSaved) {
               ${MAIN_INGREDIENTS.map((m) => `<option ${m === r.main ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
           </label>
-          <label class="field field-time">
+          <label class="field">
+            <span class="field-label">ジャンル</span>
+            <select class="input" name="cuisine">
+              ${CUISINES.map((c) => `<option ${c === r.cuisine ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
             <span class="field-label">調理時間（分）</span>
             <input class="input" name="time" type="number" inputmode="numeric" min="1" max="600" value="${esc(r.time)}">
+          </label>
+          <label class="field">
+            <span class="field-label">カロリー <small>（1人分・任意）</small></span>
+            <input class="input" name="kcal" type="number" inputmode="numeric" min="0" max="3000" value="${esc(r.kcal ?? '')}" placeholder="例：400">
           </label>
         </div>
 
@@ -110,6 +125,10 @@ export function openRecipeForm(recipe, onSaved) {
           name,
           category: data.get('category'),
           main: data.get('main'),
+          cuisine: data.get('cuisine'),
+          kcal: Number(data.get('kcal')) || null,
+          emoji: r.emoji,
+          tags: (r.tags || []).filter((t) => t !== '時短'),
           time: Math.max(1, Number(data.get('time')) || 20),
           ingredients,
           steps: data.get('steps').split('\n').map((s) => s.trim()).filter(Boolean),

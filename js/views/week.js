@@ -43,7 +43,7 @@ function dayCard(day, i, isToday) {
           <li>
             <button class="day-dish" data-pick="${i}:${key}">
               <span class="dot ${categoryClass(category)}">${SHORT[key]}</span>
-              <span class="day-dish-name">${esc(day[key]?.name || '（未設定）')}</span>
+              <span class="day-dish-name">${day[key] ? `<span class="inline-emoji" aria-hidden="true">${esc(day[key].emoji)}</span>` : ''}${esc(day[key]?.name || '（未設定）')}</span>
               <span class="day-dish-meta">${esc(day[key]?.main || '')}</span>
               ${icon('chevron', { size: 16 })}
             </button>

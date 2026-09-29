@@ -4,6 +4,7 @@ import { renderToday } from './views/today.js';
 import { renderWeek } from './views/week.js';
 import { renderShopping } from './views/shopping.js';
 import { renderRecipes } from './views/recipes.js';
+import { renderFridge } from './views/fridge.js';
 import { closeSheet } from './lib/ui.js';
 
 const ROUTES = {
@@ -11,6 +12,7 @@ const ROUTES = {
   week: { title: '1週間の献立', render: renderWeek },
   shopping: { title: '買い物リスト', render: renderShopping },
   recipes: { title: 'レシピ一覧', render: renderRecipes },
+  fridge: { title: '冷蔵庫から提案', render: renderFridge },
 };
 
 const viewEl = document.getElementById('view');

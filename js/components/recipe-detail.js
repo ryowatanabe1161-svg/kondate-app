@@ -40,12 +40,18 @@ export function openRecipeDetail(recipeId, onChange) {
   openSheet({
     title: recipe.name,
     body: `
-      <div class="detail-meta">
-        ${categoryBadge(recipe.category)}
-        <span class="chip-static">${esc(recipe.main)}</span>
-        <span class="meta-time">${icon('clock', { size: 16 })}約${esc(recipe.time)}分</span>
-        ${recipe.builtin ? '' : '<span class="chip-static mine">自分のレシピ</span>'}
+      <div class="detail-hero">
+        <span class="detail-emoji" aria-hidden="true">${esc(recipe.emoji)}</span>
+        <div class="detail-meta">
+          ${categoryBadge(recipe.category)}
+          <span class="chip-static">${esc(recipe.cuisine)}</span>
+          <span class="chip-static">${esc(recipe.main)}</span>
+          <span class="meta-time">${icon('clock', { size: 16 })}約${esc(recipe.time)}分</span>
+          ${recipe.kcal ? `<span class="meta-kcal">約${esc(recipe.kcal)}kcal<small>/1人分</small></span>` : ''}
+          ${recipe.builtin ? '' : '<span class="chip-static mine">自分のレシピ</span>'}
+        </div>
       </div>
+      ${recipe.tags.length ? `<div class="tag-row">${recipe.tags.map((t) => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
       <h3 class="section-title">材料 <small>（${servings}人分${servings === store.BASE_SERVINGS ? '' : '・2人分から換算'}）</small></h3>
       ${ingredients}
       ${steps}

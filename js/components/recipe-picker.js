@@ -22,8 +22,8 @@ export function openRecipePicker({ title, category, currentId, onPick, onRandom 
     .map((r) => `
       <li>
         <button class="picker-item ${r.id === currentId ? 'current' : ''}" data-pick="${esc(r.id)}" data-name="${esc(r.name)}">
-          <span class="picker-name">${r.fav ? `<span class="fav-mark">${icon('star', { filled: true, size: 14 })}</span>` : ''}${esc(r.name)}</span>
-          <span class="picker-meta">${esc(r.main)}・${esc(r.time)}分</span>
+          <span class="picker-name"><span class="inline-emoji" aria-hidden="true">${esc(r.emoji)}</span>${r.fav ? `<span class="fav-mark">${icon('star', { filled: true, size: 14 })}</span>` : ''}${esc(r.name)}</span>
+          <span class="picker-meta">${esc(r.cuisine)}・${esc(r.main)}・${esc(r.time)}分</span>
           ${r.id === currentId ? `<span class="picker-check">${icon('check', { size: 18 })}</span>` : ''}
         </button>
       </li>`)

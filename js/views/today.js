@@ -21,8 +21,9 @@ function dishCard(slot, category, recipe) {
   }
   return `
     <article class="dish-card ${categoryClass(category)} ${flash}" data-open="${esc(recipe.id)}" tabindex="0">
-      <div class="dish-cat">${category}</div>
+      <div class="dish-cat" aria-hidden="true">${esc(recipe.emoji)}</div>
       <div class="dish-body">
+        <p class="dish-label">${category}<span>${esc(recipe.cuisine)}</span></p>
         <h3>${esc(recipe.name)}</h3>
         <p class="dish-meta">
           <span>${esc(recipe.main)}</span>
@@ -62,6 +63,12 @@ export function renderToday(container, { rerender, headerAction }) {
     <button class="btn btn-primary btn-block btn-lg" data-reroll-all>
       ${icon('reroll')}まるごと入れ替える
     </button>
+
+    <a class="fridge-cta" href="#fridge">
+      <span class="fridge-cta-icon">${icon('fridge', { size: 26 })}</span>
+      <span class="fridge-cta-text"><b>冷蔵庫のあまりもので探す</b><small>ある食材を選ぶと、作れる料理を提案します</small></span>
+      ${icon('chevron', { size: 18 })}
+    </a>
 
     ${tomorrow ? `
       <section class="card tomorrow">

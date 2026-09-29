@@ -334,7 +334,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    ========================================================== */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   background: rgba(255, 255, 255, 0.96);
@@ -404,7 +404,6 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .field-label small { font-weight: 500; }
 .field-row { display: flex; gap: 10px; }
 .field-row > .field { flex: 1; }
-.field-time { max-width: 42%; }
 .input {
   width: 100%; min-height: 48px; padding: 10px 12px;
   border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface);
@@ -424,6 +423,71 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .ing-row .input-amount { width: 34%; flex-shrink: 0; }
 .ing-row .icon-btn { width: 36px; height: 36px; }
 .form-error { color: var(--danger); font-size: 14px; font-weight: 700; }
+
+/* ---------- 絵文字 ---------- */
+.dish-cat { font-size: 28px; font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif; }
+.dish-label { display: flex; gap: 6px; font-size: 12px; font-weight: 800; color: var(--accent); line-height: 1.3; }
+.dish-label span { color: var(--text-sub); font-weight: 700; }
+.emoji-circle {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 44px; height: 44px; margin-left: 10px; border-radius: 50%;
+  background: var(--bg); font-size: 22px;
+}
+.inline-emoji { margin-right: 6px; }
+.detail-hero { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.detail-emoji { display: grid; place-items: center; flex-shrink: 0; width: 60px; height: 60px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); font-size: 34px; }
+.detail-hero .detail-meta { margin-bottom: 0; }
+.meta-kcal { font-weight: 700; color: var(--text); }
+.meta-kcal small { font-weight: 500; color: var(--text-sub); }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tag { padding: 1px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--primary-dark); }
+
+/* ---------- 冷蔵庫から提案 ---------- */
+.fridge-cta {
+  display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 12px 14px;
+  border-radius: var(--radius); background: #eef5ff; border: 1.5px solid #cfe0f5;
+  color: #2f5d8a; text-decoration: none; box-shadow: var(--shadow);
+}
+.fridge-cta:active { transform: scale(0.99); }
+.fridge-cta-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #fff; flex-shrink: 0; }
+.fridge-cta-text { flex: 1; display: flex; flex-direction: column; line-height: 1.4; }
+.fridge-cta-text b { font-size: 16px; }
+.fridge-cta-text small { font-size: 12px; color: #5b7a99; }
+.fridge-head { display: flex; flex-direction: column; gap: 10px; }
+.fridge-lead { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #2f5d8a; }
+.selected-head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.selected-title { font-size: 13px; font-weight: 800; color: var(--text-sub); }
+.selected-title b { color: var(--text); font-size: 15px; }
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-wrap .chip { min-height: 40px; }
+.selected-chip { background: var(--cat-side-soft); border-color: #bcd9ad; color: #3d6e2c; gap: 4px; padding-right: 10px; }
+.ing-chip.active { background: var(--cat-side); border-color: var(--cat-side); color: #fff; }
+.fridge-tabs { grid-template-columns: repeat(2, 1fr); }
+.fridge-tabs span { display: flex; align-items: center; justify-content: center; gap: 2px; min-height: 44px; }
+.count-pill { display: inline-block; min-width: 22px; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 12px; line-height: 20px; }
+.fridge-picker { display: flex; flex-direction: column; gap: 12px; }
+.fridge-group { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px 14px; }
+.fridge-group-title { font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+.fridge-results { display: flex; flex-direction: column; gap: 10px; }
+.fridge-list { display: flex; flex-direction: column; gap: 10px; }
+.fridge-result { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); border-left: 5px solid var(--accent, var(--line)); padding-bottom: 10px; }
+.fridge-result.cat-main { --accent: var(--cat-main); }
+.fridge-result.cat-side { --accent: var(--cat-side); }
+.fridge-result.cat-soup { --accent: var(--cat-soup); }
+.fridge-result-main { display: flex; align-items: center; gap: 4px; width: 100%; padding: 10px 12px 4px 0; border: none; background: none; text-align: left; }
+.fridge-result-main .emoji-circle { margin-right: 6px; }
+.fridge-result-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.match-score { flex-shrink: 0; font-size: 13px; color: var(--text-sub); font-weight: 700; }
+.match-score b { font-size: 22px; color: var(--cat-side); }
+.match-detail { padding: 0 14px 0 16px; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 3px; }
+.match-label { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 800; }
+.match-have .match-label { background: var(--cat-side-soft); color: var(--cat-side); }
+.match-missing { color: var(--text-sub); }
+.match-missing .match-label { background: var(--surface-2); color: var(--text-sub); }
+.match-complete { color: var(--cat-side); font-weight: 700; }
+.fridge-result-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 12px 0; }
+.btn-sm { min-height: 40px; padding: 0 12px; font-size: 13px; border-radius: 12px; }
+.in-today { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; color: var(--cat-side); }
 
 /* ---------- 人数設定 ---------- */
 .header-icon { color: var(--text); }

@@ -15,8 +15,35 @@ export const SLOT_CATEGORY = Object.fromEntries(SLOTS.map((s) => [s.key, s.categ
 // 同じ日の中でかぶらないようにする「主な食材」（野菜などは重なってもOK）
 const PROTEINS = new Set(['肉', '魚', '卵・豆腐']);
 
+// 麺・丼の日は1週間に最大この日数まで
+export const NOODLE_MAX_PER_WEEK = 1;
+const NOODLE = '麺・丼';
+
 // お気に入りは3倍選ばれやすくする
 const favWeight = (r) => (r.fav ? 3 : 1);
+
+// ジャンルの基本の出やすさ（家庭の献立らしく和食を多めに）
+const CUISINE_WEIGHT = { 和: 3, 洋: 2, 中: 2, その他: 1.2 };
+
+/** 主菜用の重み：お気に入り × ジャンルの出やすさ ÷（その週にすでに出たジャンルの回数+1） */
+function mainWeight(cuisineCounts) {
+  return (r) => favWeight(r) * ((CUISINE_WEIGHT[r.cuisine] || 1) / (1 + (cuisineCounts[r.cuisine] || 0)));
+}
+
+/** 副菜・汁物用の重み：主菜とジャンルが合うものを選びやすく（和はどれとも合わせやすい） */
+function companionWeight(mainRecipe) {
+  return (r) => {
+    let harmony = 1;
+    if (mainRecipe) {
+      if (r.cuisine === mainRecipe.cuisine) harmony = 3;
+      else if (r.cuisine === '和' || mainRecipe.cuisine === '和') harmony = 1;
+      else harmony = 0.3; // 例：洋の主菜に中華スープ
+    }
+    return favWeight(r) * harmony;
+  };
+}
+
+const countBy = (items) => items.reduce((c, k) => (k ? ((c[k] = (c[k] || 0) + 1), c) : c), {});
 
 const poolFor = (recipes, slot) => recipes.filter((r) => r.category === SLOT_CATEGORY[slot]);
 
@@ -24,12 +51,12 @@ const poolFor = (recipes, slot) => recipes.filter((r) => r.category === SLOT_CAT
  * 条件を段階的にゆるめながら1品選ぶ。
  * stages の先頭から順に試し、候補があればその中から（お気に入り優先で）ランダムに選ぶ。
  */
-function pickWithFallback(pool, stages) {
+function pickWithFallback(pool, stages, weightFn = favWeight) {
   for (const cond of stages) {
     const candidates = pool.filter(cond);
-    if (candidates.length) return weightedPick(candidates, favWeight);
+    if (candidates.length) return weightedPick(candidates, weightFn);
   }
-  return weightedPick(pool, favWeight);
+  return weightedPick(pool, weightFn);
 }
 
 /**
@@ -39,6 +66,10 @@ function pickWithFallback(pool, stages) {
 function mainIngredientSequence(mains, n) {
   const capacity = {};
   mains.forEach((r) => (capacity[r.main] = (capacity[r.main] || 0) + 1));
+  if (capacity[NOODLE] && Object.keys(capacity).length > 1) {
+    capacity[NOODLE] = Math.min(capacity[NOODLE], NOODLE_MAX_PER_WEEK);
+    if (capacity[NOODLE] === 0) delete capacity[NOODLE];
+  }
   const types = shuffle(Object.keys(capacity));
 
   // 1) 各食材の日数を均等に割り振る（レシピ数が少ない食材は上限あり）
@@ -71,12 +102,16 @@ function pickCompanion(pool, { mainRecipe, otherRecipe, used, currentId }) {
   const notCurrent = (r) => r.id !== currentId;
   const notUsed = (r) => !used.has(r.id);
   const noClash = (r) => !avoid.has(r.main);
-  return pickWithFallback(pool, [
-    (r) => notCurrent(r) && notUsed(r) && noClash(r),
-    (r) => notCurrent(r) && notUsed(r),
-    (r) => notCurrent(r) && noClash(r),
-    notCurrent,
-  ]);
+  return pickWithFallback(
+    pool,
+    [
+      (r) => notCurrent(r) && notUsed(r) && noClash(r),
+      (r) => notCurrent(r) && notUsed(r),
+      (r) => notCurrent(r) && noClash(r),
+      notCurrent,
+    ],
+    companionWeight(mainRecipe),
+  );
 }
 
 /** 1週間分の献立を新しく作る */
@@ -86,14 +121,27 @@ export function generateWeek(recipes, startKey) {
   const soups = poolFor(recipes, 'soup');
   const sequence = mains.length ? mainIngredientSequence(mains, PLAN_DAYS) : [];
   const used = new Set();
+  const cuisineCounts = {};
 
   const days = [];
+  let prevMain = null;
   for (let i = 0; i < PLAN_DAYS; i++) {
-    const main = pickWithFallback(mains, [
-      (r) => r.main === sequence[i] && !used.has(r.id),
-      (r) => !used.has(r.id),
-    ]);
-    if (main) used.add(main.id);
+    // 洋・中・その他は2日続けない（和は続いてもOK）
+    const notSameForeign = (r) => r.cuisine === '和' || r.cuisine !== prevMain?.cuisine;
+    const main = pickWithFallback(
+      mains,
+      [
+        (r) => r.main === sequence[i] && !used.has(r.id) && notSameForeign(r),
+        (r) => r.main === sequence[i] && !used.has(r.id),
+        (r) => !used.has(r.id),
+      ],
+      mainWeight(cuisineCounts),
+    );
+    if (main) {
+      used.add(main.id);
+      cuisineCounts[main.cuisine] = (cuisineCounts[main.cuisine] || 0) + 1;
+    }
+    prevMain = main;
     const side = pickCompanion(sides, { mainRecipe: main, used });
     if (side) used.add(side.id);
     const soup = pickCompanion(soups, { mainRecipe: main, otherRecipe: side, used });
@@ -127,24 +175,28 @@ export function rerollDish(plan, dayIndex, slot, recipes) {
         .map((d) => byId.get(d.main)?.main)
         .filter(Boolean),
     );
-    const counts = {};
-    plan.days.forEach((d, i) => {
-      const m = i !== dayIndex && byId.get(d.main)?.main;
-      if (m) counts[m] = (counts[m] || 0) + 1;
-    });
+    const others = plan.days.filter((_, i) => i !== dayIndex).map((d) => byId.get(d.main)).filter(Boolean);
+    const counts = countBy(others.map((r) => r.main));
+    const cuisineCounts = countBy(others.map((r) => r.cuisine));
     const typeCount = new Set(pool.map((r) => r.main)).size || 1;
     const maxPerType = Math.ceil(plan.days.length / typeCount);
+    const noodleOk = (r) => r.main !== NOODLE || (counts[NOODLE] || 0) < NOODLE_MAX_PER_WEEK;
 
     // 同じ日の副菜・汁物と主な食材（肉・魚・卵豆腐）がかぶらないように
     const sameDay = new Set([byId.get(day.side)?.main, byId.get(day.soup)?.main].filter((m) => PROTEINS.has(m)));
     const fresh = (r) => r.id !== day.main && !used.has(r.id);
-    picked = pickWithFallback(pool, [
-      (r) => fresh(r) && !neighbors.has(r.main) && (counts[r.main] || 0) < maxPerType && !sameDay.has(r.main),
-      (r) => fresh(r) && !neighbors.has(r.main) && (counts[r.main] || 0) < maxPerType,
-      (r) => fresh(r) && !neighbors.has(r.main),
-      fresh,
-      (r) => r.id !== day.main,
-    ]);
+    picked = pickWithFallback(
+      pool,
+      [
+        (r) => fresh(r) && noodleOk(r) && !neighbors.has(r.main) && (counts[r.main] || 0) < maxPerType && !sameDay.has(r.main),
+        (r) => fresh(r) && noodleOk(r) && !neighbors.has(r.main) && (counts[r.main] || 0) < maxPerType,
+        (r) => fresh(r) && noodleOk(r) && !neighbors.has(r.main),
+        (r) => fresh(r) && noodleOk(r),
+        fresh,
+        (r) => r.id !== day.main,
+      ],
+      mainWeight(cuisineCounts),
+    );
   } else {
     const otherSlot = slot === 'side' ? 'soup' : 'side';
     picked = pickCompanion(pool, {

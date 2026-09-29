@@ -24,19 +24,22 @@ function matches(recipe, query) {
   return (
     recipe.name.toLowerCase().includes(q) ||
     recipe.main.includes(q) ||
-    recipe.ingredients.some((i) => i.name.includes(q))
+    recipe.ingredients.some((i) => i.name.includes(q)) ||
+    recipe.tags.some((t) => t.includes(q))
   );
 }
 
 function recipeRow(r) {
   return `
     <li class="recipe-row ${categoryClass(r.category)}">
+      <span class="emoji-circle" aria-hidden="true">${esc(r.emoji)}</span>
       <button class="recipe-open" data-open="${esc(r.id)}">
         <span class="recipe-name">${esc(r.name)}${r.builtin ? '' : '<span class="mine-dot">自作</span>'}</span>
         <span class="recipe-meta">
           ${categoryBadge(r.category)}
-          <span>${esc(r.main)}</span>
+          <span>${esc(r.cuisine)}・${esc(r.main)}</span>
           <span class="meta-time">${icon('clock', { size: 14 })}${esc(r.time)}分</span>
+          ${r.kcal ? `<span>${esc(r.kcal)}kcal</span>` : ''}
         </span>
       </button>
       <button class="fav-btn ${r.fav ? 'on' : ''}" data-fav="${esc(r.id)}" aria-pressed="${r.fav}" aria-label="${esc(r.name)}をお気に入り${r.fav ? 'から外す' : 'に追加'}">
@@ -49,7 +52,7 @@ export function renderRecipes(container, { rerender }) {
   container.innerHTML = `
     <div class="search-box">
       ${icon('search', { size: 18 })}
-      <input type="search" class="search-input" placeholder="料理名・材料で検索" value="${esc(filterState.query)}" aria-label="レシピを検索">
+      <input type="search" class="search-input" placeholder="料理名・材料・タグで検索" value="${esc(filterState.query)}" aria-label="レシピを検索">
     </div>
     <div class="chips" role="tablist">
       ${FILTERS.map((f) => `
