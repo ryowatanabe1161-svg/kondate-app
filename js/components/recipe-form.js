@@ -29,6 +29,7 @@ export function openRecipeForm(recipe, onSaved) {
     kcal: '',
     ingredients: [],
     steps: [],
+    tips: [],
     ...recipe,
   };
   const rows = (r.ingredients.length ? r.ingredients : [{}, {}, {}]).map(ingredientRow).join('');
@@ -87,6 +88,11 @@ export function openRecipeForm(recipe, onSaved) {
           <textarea class="input" name="steps" rows="4" placeholder="例：玉ねぎを薄切りにする">${esc(r.steps.join('\n'))}</textarea>
         </label>
 
+        <label class="field">
+          <span class="field-label">コツ・ポイント <small>（任意・1行に1つ）</small></span>
+          <textarea class="input" name="tips" rows="2" placeholder="例：玉ねぎはしっかり炒めると甘みが出る">${esc((r.tips || []).join('\n'))}</textarea>
+        </label>
+
         <p class="form-error" hidden></p>
         <button type="submit" class="btn btn-primary btn-block">${isEdit ? '保存する' : '追加する'}</button>
       </form>`,
@@ -132,6 +138,7 @@ export function openRecipeForm(recipe, onSaved) {
           time: Math.max(1, Number(data.get('time')) || 20),
           ingredients,
           steps: data.get('steps').split('\n').map((s) => s.trim()).filter(Boolean),
+          tips: String(data.get('tips') || '').split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 5),
         });
         toast(isEdit ? 'レシピを保存しました' : 'レシピを追加しました');
         closeSheet();

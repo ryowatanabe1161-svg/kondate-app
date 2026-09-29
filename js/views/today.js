@@ -53,6 +53,7 @@ export function renderToday(container, { rerender, headerAction }) {
 
   container.innerHTML = `
     <section class="today-hero">
+      <p class="app-brand"><span aria-hidden="true">🍳</span>デミさんクッキング</p>
       <p class="today-date">${formatDateLong(todayKey())}</p>
       <p class="today-lead">今日のごはんはこれにしよう
         <button class="servings-chip" data-settings>${icon('user', { size: 14 })}${getServings()}人分</button>

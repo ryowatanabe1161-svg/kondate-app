@@ -27,8 +27,15 @@ export function openRecipeDetail(recipeId, onChange) {
     : '<p class="muted">材料が登録されていません。</p>';
 
   const steps = recipe.steps?.length
-    ? `<h3 class="section-title">作り方</h3>
+    ? `<h3 class="section-title">作り方 <small>（${recipe.steps.length}ステップ）</small></h3>
+       ${servings === store.BASE_SERVINGS ? '' : '<p class="steps-note">※ 作り方の中の分量・時間は2人分の目安です</p>'}
        <ol class="steps">${recipe.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>`
+    : '';
+  const tips = recipe.tips?.length
+    ? `<aside class="tips-box" aria-label="コツ・ポイント">
+         <h3 class="tips-title"><span aria-hidden="true">💡</span>コツ・ポイント</h3>
+         <ul class="tips-list">${recipe.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+       </aside>`
     : '';
 
   const ownerActions = recipe.builtin
@@ -74,6 +81,7 @@ export function openRecipeDetail(recipeId, onChange) {
       <h3 class="section-title">材料 <small>（${servings}人分${servings === store.BASE_SERVINGS ? '' : '・2人分から換算'}）</small></h3>
       ${ingredients}
       ${steps}
+      ${tips}
       <div class="sheet-actions">
         <div class="btn-row">
           <button class="btn btn-outline fav-toggle ${recipe.fav ? 'on' : ''}" data-act="fav">

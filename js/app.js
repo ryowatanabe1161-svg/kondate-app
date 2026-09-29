@@ -7,6 +7,8 @@ import { renderRecipes } from './views/recipes.js';
 import { renderFridge } from './views/fridge.js';
 import { closeSheet } from './lib/ui.js';
 
+const APP_NAME = 'デミさんクッキング';
+
 const ROUTES = {
   today: { title: '今日の献立', render: renderToday },
   week: { title: '1週間の献立', render: renderWeek },
@@ -29,7 +31,7 @@ function render() {
   const route = ROUTES[key];
 
   titleEl.textContent = route.title;
-  document.title = `${route.title}｜毎日の献立`;
+  document.title = `${route.title}｜${APP_NAME}`;
   document.querySelectorAll('.tabbar a').forEach((a) => {
     const active = a.dataset.tab === key;
     a.classList.toggle('active', active);

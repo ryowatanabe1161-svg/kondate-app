@@ -1,7 +1,7 @@
 {
-  "name": "毎日の献立",
-  "short_name": "献立",
-  "description": "毎日の献立を自動で考えて、1週間分の買い物リストまで作れるアプリ",
+  "name": "デミさんクッキング",
+  "short_name": "デミさん",
+  "description": "デミさんクッキング：毎日の献立を自動で考えて、1週間分の買い物リストまで作れるアプリ",
   "lang": "ja",
   "start_url": "./index.html#today",
   "scope": "./",

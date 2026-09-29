@@ -1,5 +1,5 @@
 /* ==========================================================
-   毎日の献立 — スマホ向けスタイル
+   デミさんクッキング — スマホ向けスタイル
    ========================================================== */
 
 :root {
@@ -145,6 +145,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
    今日の献立
    ========================================================== */
 .today-hero { padding: 6px 2px 0; }
+.app-brand { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 2px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: var(--primary-dark); }
 .today-date { font-size: 26px; font-weight: 800; letter-spacing: 0.02em; }
 .today-lead { color: var(--text-sub); font-size: 14px; }
 
@@ -375,13 +376,25 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .ing-list li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 15px; }
 .ing-list li:last-child { border-bottom: none; }
 .ing-amount { color: var(--text-sub); white-space: nowrap; }
-.steps { counter-reset: step; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.steps li { counter-increment: step; position: relative; padding-left: 34px; font-size: 15px; }
-.steps li::before {
-  content: counter(step); position: absolute; left: 0; top: 1px;
-  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--primary-soft); color: var(--primary-dark); font-size: 13px; font-weight: 800;
+.steps { counter-reset: step; list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; }
+.steps li {
+  counter-increment: step; position: relative; padding: 12px 2px 12px 40px;
+  font-size: 15.5px; line-height: 1.75; border-bottom: 1px dashed var(--line); overflow-wrap: anywhere;
 }
+.steps li:last-child { border-bottom: none; }
+.steps li::before {
+  content: counter(step); position: absolute; left: 0; top: 13px;
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-size: 14px; font-weight: 800;
+}
+.steps-note { font-size: 12px; color: var(--text-sub); margin: -4px 0 4px; }
+.tips-box {
+  margin: 0 0 16px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: #fff8e6; border: 1.5px solid #f3dfae;
+}
+.tips-title { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 14px; font-weight: 800; color: #8a5a00; }
+.tips-list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.7; }
+.tips-list li::marker { color: #d9a23a; }
 .sheet-actions { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
 .fav-toggle.on { color: #d98a10; border-color: #f3d39a; background: #fff8e8; }
 
