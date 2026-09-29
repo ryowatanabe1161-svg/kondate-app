@@ -11,8 +11,10 @@ import { closeSheet, icon, openSheet, stars } from '../lib/ui.js';
  * @param {string|null} opts.currentId
  * @param {(id: string) => void} opts.onPick
  * @param {() => void} opts.onRandom
+ * @param {boolean} [opts.locked] この料理が固定されているか
+ * @param {() => boolean} [opts.onToggleLock] 固定の切り替え（新しい状態を返す）。なければ固定の欄を出さない
  */
-export function openRecipePicker({ title, category, currentId, onPick, onRandom }) {
+export function openRecipePicker({ title, category, currentId, onPick, onRandom, locked = false, onToggleLock }) {
   const recipes = store
     .allRecipes()
     .filter((r) => r.category === category)
@@ -32,13 +34,26 @@ export function openRecipePicker({ title, category, currentId, onPick, onRandom 
   openSheet({
     title,
     body: `
-      <button class="btn btn-primary btn-block" data-random>${icon('reroll', { size: 18 })}おまかせで選び直す</button>
+      ${onToggleLock ? `
+        <label class="switch-row lock-row">
+          <span class="switch-text"><b>${icon('lock', { size: 16 })}この${esc(category)}を固定する</b><small>固定すると「作り直す」や条件の変更でも変わりません</small></span>
+          <input type="checkbox" name="lockDish" role="switch" ${locked ? 'checked' : ''}>
+          <span class="switch" aria-hidden="true"></span>
+        </label>` : ''}
+      <button class="btn btn-primary btn-block" data-random ${locked ? 'disabled' : ''}>${icon('reroll', { size: 18 })}${locked ? '固定中のためおまかせ不可' : 'おまかせで選び直す'}</button>
       <div class="search-box in-sheet">
         ${icon('search', { size: 18 })}
         <input type="search" class="search-input" placeholder="${esc(category)}を検索" aria-label="${esc(category)}を検索">
       </div>
       <ul class="picker-list">${items}</ul>`,
     onMount(sheet) {
+      sheet.querySelector('input[name=lockDish]')?.addEventListener('change', (e) => {
+        const on = onToggleLock();
+        e.target.checked = on;
+        const random = sheet.querySelector('[data-random]');
+        random.disabled = on;
+        random.innerHTML = `${icon('reroll', { size: 18 })}${on ? '固定中のためおまかせ不可' : 'おまかせで選び直す'}`;
+      });
       sheet.querySelector('[data-random]').addEventListener('click', () => {
         closeSheet();
         onRandom();

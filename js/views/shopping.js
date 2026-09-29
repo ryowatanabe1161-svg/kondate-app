@@ -7,8 +7,18 @@ import { SEASONING_GROUP } from '../data/ingredients.js';
 import { esc, formatDateShort, uid } from '../lib/util.js';
 import { icon, toast } from '../lib/ui.js';
 import { openSettingsSheet } from '../components/settings-sheet.js';
+import { showWeek } from './week.js';
 
 let seasoningOpen = false;
+let shopWeek = 'this'; // 表示中の週（'this' | 'next'）
+
+function weekTabs() {
+  return `
+    <div class="segmented week-tabs" role="tablist" aria-label="買い物リストの週">
+      <label><input type="radio" name="shopWeek" value="this" ${shopWeek === 'this' ? 'checked' : ''}><span>今週の分</span></label>
+      <label><input type="radio" name="shopWeek" value="next" ${shopWeek === 'next' ? 'checked' : ''}><span>来週の分</span></label>
+    </div>`;
+}
 
 function itemRow({ key, name, amount, dishes, checked, removable }) {
   return `
@@ -27,10 +37,30 @@ function itemRow({ key, name, amount, dishes, checked, removable }) {
 }
 
 export function renderShopping(container, { rerender }) {
-  const days = actions.resolvedDays();
+  container.addEventListener('change', (e) => {
+    const tab = e.target.closest('input[name=shopWeek]');
+    if (!tab) return;
+    shopWeek = tab.value;
+    rerender();
+  });
+  const week = shopWeek === 'next' && actions.getNextPlan() ? 'next' : shopWeek;
+  if (week === 'next' && !actions.getNextPlan()) {
+    const start = actions.nextWeekStart();
+    container.innerHTML = `
+      ${weekTabs()}
+      <section class="card next-empty">
+        <p class="next-empty-icon" aria-hidden="true">🛒</p>
+        <h3>来週（${formatDateShort(start)}〜）の献立がまだありません</h3>
+        <p class="hint">1週間の画面で来週の献立を作ると、来週の分の買い物リストができます。</p>
+        <a class="btn btn-primary btn-block" href="#week" data-go-next>来週の献立を作る</a>
+      </section>`;
+    container.querySelector('[data-go-next]').addEventListener('click', () => showWeek('next'));
+    return;
+  }
+  const days = actions.resolvedDays(week);
   const servings = store.getServings();
   const groups = buildShoppingList(days, store.servingFactor());
-  const shopping = store.getShopping();
+  const shopping = store.getShopping(week);
   const checked = new Set(shopping.checked);
 
   const extras = shopping.extras || [];
@@ -65,9 +95,10 @@ export function renderShopping(container, { rerender }) {
     : '';
 
   container.innerHTML = `
+    ${weekTabs()}
     <section class="card shop-head">
       <div class="shop-head-row">
-        <p class="week-range">${formatDateShort(days[0].date)} 〜 ${formatDateShort(days[days.length - 1].date)} の7日分</p>
+        <p class="week-range">${week === 'next' ? '来週' : '今週'} ${formatDateShort(days[0].date)} 〜 ${formatDateShort(days[days.length - 1].date)}</p>
         <button class="servings-chip" data-settings aria-label="人数を変更（現在${servings}人分）">${icon('user', { size: 14 })}${servings}人分</button>
       </div>
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
@@ -94,7 +125,7 @@ export function renderShopping(container, { rerender }) {
     const box = e.target.closest('[data-check]');
     if (!box) return;
     const key = box.dataset.check;
-    const current = store.getShopping();
+    const current = store.getShopping(week);
     const extra = current.extras.find((x) => x.id === key);
     if (extra) {
       extra.checked = box.checked;
@@ -103,7 +134,7 @@ export function renderShopping(container, { rerender }) {
       box.checked ? set.add(key) : set.delete(key);
       current.checked = [...set];
     }
-    store.setShopping(current);
+    store.setShopping(current, week);
     rerender();
   });
 
@@ -114,17 +145,17 @@ export function renderShopping(container, { rerender }) {
     }
     const remove = e.target.closest('[data-remove-extra]');
     if (remove) {
-      const current = store.getShopping();
+      const current = store.getShopping(week);
       current.extras = current.extras.filter((x) => x.id !== remove.dataset.removeExtra);
-      store.setShopping(current);
+      store.setShopping(current, week);
       rerender();
       return;
     }
     if (e.target.closest('[data-clear]')) {
-      const current = store.getShopping();
+      const current = store.getShopping(week);
       current.checked = [];
       current.extras = current.extras.map((x) => ({ ...x, checked: false }));
-      store.setShopping(current);
+      store.setShopping(current, week);
       toast('チェックをすべて外しました');
       rerender();
     }
@@ -135,9 +166,9 @@ export function renderShopping(container, { rerender }) {
     const input = e.target.elements.itemName;
     const name = input.value.trim();
     if (!name) return;
-    const current = store.getShopping();
+    const current = store.getShopping(week);
     current.extras = [...(current.extras || []), { id: uid('x'), name, checked: false }];
-    store.setShopping(current);
+    store.setShopping(current, week);
     toast(`「${name}」を追加しました`);
     rerender();
   });

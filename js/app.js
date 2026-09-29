@@ -31,6 +31,7 @@ function render() {
   const route = ROUTES[key];
 
   titleEl.textContent = route.title;
+  document.body.dataset.route = key; // 今日の画面ではロゴを大きく表示
   document.title = `${route.title}｜${APP_NAME}`;
   document.querySelectorAll('.tabbar a').forEach((a) => {
     const active = a.dataset.tab === key;

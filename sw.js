@@ -1,7 +1,7 @@
 // Service Worker：アプリ本体をキャッシュしてオフラインでも開けるようにする
 // ファイルを更新したら CACHE_VERSION を上げてください。
 
-const CACHE_VERSION = 'kondate-v5';
+const CACHE_VERSION = 'kondate-v6';
 
 const APP_SHELL = [
   './',
@@ -24,6 +24,7 @@ const APP_SHELL = [
   './js/components/recipe-form.js',
   './js/components/recipe-picker.js',
   './js/components/settings-sheet.js',
+  './js/components/conditions-sheet.js',
   './js/components/nutrition-view.js',
   './js/views/today.js',
   './js/views/week.js',

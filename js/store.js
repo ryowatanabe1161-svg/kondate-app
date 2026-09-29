@@ -3,7 +3,7 @@
 import { BUILTIN_RECIPES, normalizeRecipe } from './data/recipes.js';
 
 const STORAGE_KEY = 'kondate.v1'; // キー名は初期版から据え置き（中身の version で移行を管理）
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
 export const RATING_MAX = 5;
 
@@ -11,12 +11,73 @@ export const RATING_MAX = 5;
 export const BASE_SERVINGS = 2;
 export const SERVING_OPTIONS = [1, 2, 3, 4];
 
+// ---- 献立の条件 ----
+export const QUICK_LIMITS = { main: [15, 20, 30], total: [30, 40, 45, 60] };
+export const KCAL_TARGETS = [500, 600, 700, 800];
+export const CUISINE_PREFS = ['none', '和', '洋', '中'];
+
+export const DEFAULT_CONDITIONS = () => ({
+  quickWeekday: false, // 平日は時短
+  quickScope: 'main', // 'main'（主菜の調理時間） | 'total'（3品の合計）
+  quickLimit: 20, // 分
+  relaxWeekend: true, // 休日（土日）は時短にしない
+  budget: false, // 節約モード
+  healthy: false, // ヘルシーモード
+  kcalTarget: null, // ヘルシーモードの1日（夕食1食）のカロリー目標（1人分）。null は目標なし
+  cuisinePref: 'none', // ジャンルの好み（'none' | '和' | '洋' | '中'）
+});
+
+/** 保存データの条件を安全な値にそろえる */
+export function sanitizeConditions(value) {
+  const d = DEFAULT_CONDITIONS();
+  const v = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const c = {
+    quickWeekday: v.quickWeekday === true,
+    quickScope: v.quickScope === 'total' ? 'total' : 'main',
+    quickLimit: Number(v.quickLimit),
+    relaxWeekend: v.relaxWeekend !== false,
+    budget: v.budget === true,
+    healthy: v.healthy === true,
+    kcalTarget: KCAL_TARGETS.includes(Number(v.kcalTarget)) ? Number(v.kcalTarget) : null,
+    cuisinePref: CUISINE_PREFS.includes(v.cuisinePref) ? v.cuisinePref : 'none',
+  };
+  if (!QUICK_LIMITS[c.quickScope].includes(c.quickLimit)) c.quickLimit = c.quickScope === 'main' ? d.quickLimit : 40;
+  return c;
+}
+
+const SLOT_KEYS = ['main', 'side', 'soup'];
+
+/** 献立データを安全な形にそろえる（固定フラグを含む）。壊れていれば null */
+function sanitizePlan(plan) {
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.days) || typeof plan.start !== 'string') return null;
+  return {
+    ...plan,
+    days: plan.days.map((d) => ({
+      ...d,
+      locked: d.locked === true,
+      lockedSlots: Array.isArray(d.lockedSlots) ? SLOT_KEYS.filter((k) => d.lockedSlots.includes(k)) : [],
+    })),
+  };
+}
+
+const emptyShopping = (planId = null) => ({ planId, checked: [], extras: [] });
+
+function sanitizeShopping(value) {
+  const s = { ...emptyShopping(), ...(value && typeof value === 'object' ? value : {}) };
+  if (!Array.isArray(s.checked)) s.checked = [];
+  if (!Array.isArray(s.extras)) s.extras = [];
+  return s;
+}
+
 const DEFAULT_STATE = () => ({
   version: CURRENT_VERSION,
   customRecipes: [], // ユーザーが追加したレシピ
   favorites: [], // お気に入りのレシピID
-  plan: null, // { id, start: 'YYYY-MM-DD', days: [{ date, main, side, soup }] }
-  shopping: { planId: null, checked: [], extras: [] }, // 買い物リストのチェック状態
+  plan: null, // 今週 { id, start: 'YYYY-MM-DD', days: [{ date, main, side, soup, locked, lockedSlots }] }
+  nextPlan: null, // 来週（今週の最終日の翌日から7日分。作ったときだけ）
+  shopping: emptyShopping(), // 今週の買い物リストのチェック状態
+  shoppingNext: emptyShopping(), // 来週の買い物リスト
+  conditions: DEFAULT_CONDITIONS(), // 献立の条件
   servings: BASE_SERVINGS, // 何人分で作るか（1〜4人）
   fridge: [], // 冷蔵庫にある食材（提案機能で選んだもの）
   ratings: {}, // レシピの星評価 { レシピID: 1〜5 }（未評価は含めない）
@@ -39,6 +100,7 @@ function load() {
  * 古い保存データを現在の形式にそろえる。
  * v1（初期版）→ v2: 冷蔵庫の食材リストを追加。自作レシピのジャンル等は読み込み時に補完する。
  * v2 → v3: レシピの星評価（ratings）を追加。壊れた値は捨てる。
+ * v3 → v4: 献立の条件・来週の献立・来週の買い物リスト・日／料理の固定フラグを追加。
  */
 function migrate(saved) {
   const base = DEFAULT_STATE();
@@ -47,9 +109,11 @@ function migrate(saved) {
   s.favorites = Array.isArray(s.favorites) ? s.favorites : [];
   s.fridge = Array.isArray(s.fridge) ? s.fridge : [];
   s.ratings = sanitizeRatings(s.ratings);
-  s.shopping = { ...base.shopping, ...(s.shopping || {}) };
-  if (!Array.isArray(s.shopping.checked)) s.shopping.checked = [];
-  if (!Array.isArray(s.shopping.extras)) s.shopping.extras = [];
+  s.shopping = sanitizeShopping(s.shopping);
+  s.shoppingNext = sanitizeShopping(s.shoppingNext);
+  s.conditions = sanitizeConditions(s.conditions);
+  s.plan = sanitizePlan(s.plan);
+  s.nextPlan = sanitizePlan(s.nextPlan);
   if (s.version !== CURRENT_VERSION) {
     s.version = CURRENT_VERSION;
     try {
@@ -142,29 +206,56 @@ export function setRating(id, n) {
 
 // ---- 献立 ----
 
-export function getPlan() {
-  return state.plan;
+// week: 'this'（今週） | 'next'（来週）
+const PLAN_KEY = { this: 'plan', next: 'nextPlan' };
+const SHOP_KEY = { this: 'shopping', next: 'shoppingNext' };
+
+export function getPlan(week = 'this') {
+  return state[PLAN_KEY[week] || 'plan'];
 }
 
-export function setPlan(plan) {
-  state.plan = plan;
+export function setPlan(plan, week = 'this') {
+  state[PLAN_KEY[week] || 'plan'] = plan;
+  save();
+}
+
+/** 今週が終わったとき：来週の献立と買い物リストをそのまま今週にする（作り直さない） */
+export function rolloverToNextWeek() {
+  state.plan = state.nextPlan;
+  state.nextPlan = null;
+  state.shopping = state.shoppingNext;
+  state.shoppingNext = emptyShopping();
   save();
 }
 
 // ---- 買い物リスト ----
 
-export function getShopping() {
+export function getShopping(week = 'this') {
+  const key = SHOP_KEY[week] || 'shopping';
+  const plan = getPlan(week);
   // 献立を作り直したらチェック状態はリセット（追加した項目は残す）
-  if (state.plan && state.shopping.planId !== state.plan.id) {
-    state.shopping = { planId: state.plan.id, checked: [], extras: state.shopping.extras || [] };
+  if (plan && state[key].planId !== plan.id) {
+    state[key] = { planId: plan.id, checked: [], extras: state[key].extras || [] };
     save();
   }
-  return state.shopping;
+  return state[key];
 }
 
-export function setShopping(shopping) {
-  state.shopping = shopping;
+export function setShopping(shopping, week = 'this') {
+  state[SHOP_KEY[week] || 'shopping'] = shopping;
   save();
+}
+
+// ---- 献立の条件 ----
+
+export function getConditions() {
+  return { ...state.conditions };
+}
+
+export function setConditions(conditions) {
+  state.conditions = sanitizeConditions({ ...state.conditions, ...conditions });
+  save();
+  return getConditions();
 }
 
 // ---- 人数設定 ----

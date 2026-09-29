@@ -1,7 +1,7 @@
 // 画面1：今日の献立
 
 import * as actions from '../actions.js';
-import { SLOTS } from '../planner.js';
+import { SLOTS, isLocked } from '../planner.js';
 import { esc, formatDateLong, todayKey } from '../lib/util.js';
 import { categoryClass, icon, stars, toast } from '../lib/ui.js';
 import { openRecipeDetail } from '../components/recipe-detail.js';
@@ -12,7 +12,7 @@ import { mealNutritionCard } from '../components/nutrition-view.js';
 
 let flashSlots = []; // 直前に入れ替えた枠（アニメーション用）
 
-function dishCard(slot, category, recipe) {
+function dishCard(slot, category, recipe, locked = false) {
   const flash = flashSlots.includes(slot) ? 'flash' : '';
   if (!recipe) {
     return `
@@ -35,7 +35,9 @@ function dishCard(slot, category, recipe) {
           ${stars(recipe.rating)}
         </p>
       </div>
-      <button class="reroll-btn" data-reroll="${slot}" aria-label="${category}を入れ替える">${icon('reroll')}</button>
+      ${locked
+        ? `<button class="reroll-btn is-locked" data-locked="${slot}" aria-label="${category}は固定中">${icon('lock')}</button>`
+        : `<button class="reroll-btn" data-reroll="${slot}" aria-label="${category}を入れ替える">${icon('reroll')}</button>`}
     </article>`;
 }
 
@@ -53,7 +55,6 @@ export function renderToday(container, { rerender, headerAction }) {
 
   container.innerHTML = `
     <section class="today-hero">
-      <p class="app-brand"><span aria-hidden="true">🍳</span>デミさんクッキング</p>
       <p class="today-date">${formatDateLong(todayKey())}</p>
       <p class="today-lead">今日のごはんはこれにしよう
         <button class="servings-chip" data-settings>${icon('user', { size: 14 })}${getServings()}人分</button>
@@ -61,7 +62,7 @@ export function renderToday(container, { rerender, headerAction }) {
     </section>
 
     <div class="dish-list">
-      ${SLOTS.map(({ key, category }) => dishCard(key, category, today[key])).join('')}
+      ${SLOTS.map(({ key, category }) => dishCard(key, category, today[key], isLocked(today, key))).join('')}
     </div>
 
     <p class="today-total">${icon('clock', { size: 16 })}調理時間の目安 合計 約${totalTime}分<span class="sep">／</span>約${meal.kcal}kcal<small>（1人分・目安）</small></p>
@@ -92,19 +93,29 @@ export function renderToday(container, { rerender, headerAction }) {
       openSettingsSheet(rerender);
       return;
     }
+    if (e.target.closest('[data-locked]')) {
+      toast('固定中の料理です（1週間の画面で解除できます）');
+      return;
+    }
     const reroll = e.target.closest('[data-reroll]');
     if (reroll) {
       e.stopPropagation();
       const slot = reroll.dataset.reroll;
-      actions.rerollDish(index, slot);
+      const msg = actions.relaxMessage(actions.rerollDish(index, slot));
+      if (msg) toast(msg);
       flashSlots = [slot];
       rerender();
       return;
     }
     if (e.target.closest('[data-reroll-all]')) {
-      actions.rerollDay(index);
-      flashSlots = SLOTS.map((s) => s.key);
-      toast('今日の献立を入れ替えました');
+      const free = SLOTS.filter(({ key }) => !isLocked(today, key)).map((s) => s.key);
+      if (!free.length) {
+        toast('今日の献立はすべて固定中です（1週間の画面で解除できます）');
+        return;
+      }
+      const msg = actions.relaxMessage(actions.rerollDay(index));
+      flashSlots = free;
+      toast(msg || (free.length < 3 ? '固定していない料理を入れ替えました' : '今日の献立を入れ替えました'));
       rerender();
       return;
     }
